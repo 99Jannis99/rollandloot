@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { getFriendsList, FriendshipRequest } from '../services/friendshipService';
 import { syncUser } from '../services/userService';
-import { inviteToGroup } from '../services/groupService';
+import { inviteToGroup, getGroupMembers } from '../services/groupService';
 
 interface InviteFriendsToGroupProps {
   groupId: string;
@@ -29,21 +29,30 @@ export function InviteFriendsToGroup({ groupId }: InviteFriendsToGroupProps) {
       setLoading(true);
       setError(null);
       const supabaseUser = await syncUser(user);
+      
+      // Hole alle Freunde
       const friendsList = await getFriendsList(supabaseUser.id);
       
-      // Konvertiere die Freundschaftsliste in eine Liste von Freunden
-      const friendsData = friendsList.map(friendship => {
-        const friend = friendship.user1_id === supabaseUser.id 
-          ? friendship.user2! 
-          : friendship.user1!;
-        return {
-          id: friendship.user1_id === supabaseUser.id 
-            ? friendship.user2_id 
-            : friendship.user1_id,
-          username: friend.username,
-          avatar_url: friend.avatar_url
-        };
-      });
+      // Hole alle Gruppenmitglieder
+      const groupMembers = await getGroupMembers(groupId);
+      const groupMemberIds = groupMembers.map(member => member.user_id);
+      
+      // Konvertiere die Freundschaftsliste in eine Liste von Freunden,
+      // filtere aber bereits eingeladene Freunde heraus
+      const friendsData = friendsList
+        .map(friendship => {
+          const friend = friendship.user1_id === supabaseUser.id 
+            ? friendship.user2! 
+            : friendship.user1!;
+          return {
+            id: friendship.user1_id === supabaseUser.id 
+              ? friendship.user2_id 
+              : friendship.user1_id,
+            username: friend.username,
+            avatar_url: friend.avatar_url
+          };
+        })
+        .filter(friend => !groupMemberIds.includes(friend.id));
       
       setFriends(friendsData);
     } catch (err: any) {
@@ -54,6 +63,10 @@ export function InviteFriendsToGroup({ groupId }: InviteFriendsToGroupProps) {
     }
   }
 
+  useEffect(() => {
+    loadFriends();
+  }, [user, groupId]);
+
   async function handleInvite(friendId: string, friendUsername: string) {
     if (!user) return;
     
@@ -62,11 +75,10 @@ export function InviteFriendsToGroup({ groupId }: InviteFriendsToGroupProps) {
       setError(null);
       setSuccessMessage(null);
       
-      const supabaseUser = await syncUser(user);
       await inviteToGroup(groupId, friendId);
       
       setSuccessMessage(`Invited ${friendUsername} to the group`);
-      // Optional: Entferne den eingeladenen Freund aus der Liste
+      // Entferne den eingeladenen Freund aus der Liste
       setFriends(prev => prev.filter(f => f.id !== friendId));
     } catch (err: any) {
       setError(err.message || 'Failed to invite friend');
@@ -75,11 +87,6 @@ export function InviteFriendsToGroup({ groupId }: InviteFriendsToGroupProps) {
       setInvitingFriendId(null);
     }
   }
-
-  // Lade Freunde beim ersten Öffnen
-  useState(() => {
-    loadFriends();
-  }, [user]);
 
   if (loading && friends.length === 0) {
     return <div>Loading friends...</div>;
