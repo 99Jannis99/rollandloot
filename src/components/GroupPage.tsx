@@ -125,22 +125,25 @@ export function GroupPage() {
             key={shouldRefreshInventories}
           />
         </div>
-        <div className="flex flex-col gap-8">
-          {(userRole === 'admin' || userRole === 'dm') && (
+        <div className="space-y-8">
+          <h2 className="text-2xl font-bold">Group Members</h2>
+          <div className="space-y-8">
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-              <InviteFriendsToGroup 
-                groupId={group.id} 
-                onMemberAdded={handleMemberAdded}
+              <GroupMembers 
+                members={members}
+                groupId={group.id}
+                userRole={userRole}
+                onMembersUpdate={setMembers}
               />
             </div>
-          )}
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-            <GroupMembers 
-              members={members}
-              groupId={group.id}
-              userRole={userRole}
-              onMembersUpdate={setMembers}
-            />
+            {(userRole === 'admin' || userRole === 'dm') && (
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                <InviteFriendsToGroup 
+                  groupId={group.id} 
+                  onMemberAdded={handleMemberAdded}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

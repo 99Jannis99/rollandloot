@@ -52,10 +52,14 @@ export function GroupMembers({ members, groupId, userRole, onMembersUpdate }: Gr
     }
   };
 
+  const truncateUsername = (username: string, maxLength: number = 15) => {
+    return username.length > maxLength 
+      ? username.slice(0, maxLength) + '...'
+      : username;
+  };
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Group Members</h2>
-      
       {error && (
         <div className="text-red-400 text-sm p-2 bg-red-500/10 rounded-lg">
           {error}
@@ -76,7 +80,9 @@ export function GroupMembers({ members, groupId, userRole, onMembersUpdate }: Gr
                 alt={member.users.username}
                 className="w-8 h-8 rounded-full"
               />
-              <span>{member.users.username}</span>
+              <span title={member.users.username}>
+                {truncateUsername(member.users.username)}
+              </span>
             </div>
             <span className={`px-2 py-1 rounded-full text-sm ${getRoleBadgeColor(member.role)}`}>
               {member.role.toUpperCase()}
