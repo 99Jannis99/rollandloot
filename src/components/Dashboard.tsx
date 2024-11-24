@@ -4,9 +4,6 @@ import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { CreateGroupModal } from "./CreateGroupModal";
 import { syncUser } from "../services/userService";
-import { FriendsList } from './FriendsList';
-import { FriendRequests } from './FriendRequests';
-import { AddFriend } from './AddFriend';
 import { EditGroupModal } from './EditGroupModal';
 import { PencilIcon } from './icons';
 
@@ -129,14 +126,6 @@ export function Dashboard() {
         >
           Create New Group
         </button>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-8 mb-8">
-        <div className="space-y-8">
-          <FriendRequests />
-          <AddFriend />
-        </div>
-        <FriendsList />
       </div>
 
       <div>

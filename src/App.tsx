@@ -4,6 +4,7 @@ import { Navigation } from "./components/Navigation";
 import { LandingPage } from "./components/LandingPage";
 import { Dashboard } from "./components/Dashboard";
 import { GroupPage } from "./components/GroupPage";
+import { FriendsPage } from "./components/FriendsPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function App() {
@@ -22,6 +23,11 @@ function App() {
                   <LandingPage />
                 </SignedOut>
               </>
+            } />
+            <Route path="/friends" element={
+              <ProtectedRoute>
+                <FriendsPage />
+              </ProtectedRoute>
             } />
             <Route path="/group/:id" element={
               <ProtectedRoute>

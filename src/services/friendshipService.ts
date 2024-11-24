@@ -127,4 +127,13 @@ export async function searchUsers(query: string, currentUserId: string): Promise
 
   if (error) throw error;
   return data || [];
+}
+
+export async function removeFriend(friendshipId: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_friends')
+    .delete()
+    .eq('id', friendshipId);
+
+  if (error) throw error;
 } 
