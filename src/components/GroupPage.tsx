@@ -31,6 +31,7 @@ export function GroupPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [userRole, setUserRole] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [shouldRefreshInventories, setShouldRefreshInventories] = useState(0);
 
   async function fetchGroupData() {
     try {
@@ -84,6 +85,11 @@ export function GroupPage() {
     fetchGroupData();
   }, [id, user]);
 
+  const handleMemberAdded = async () => {
+    await fetchGroupData();
+    setShouldRefreshInventories(prev => prev + 1);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -114,14 +120,17 @@ export function GroupPage() {
 
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
-          <GroupInventoryOverview groupId={group.id} />
+          <GroupInventoryOverview 
+            groupId={group.id} 
+            key={shouldRefreshInventories}
+          />
         </div>
         <div className="flex flex-col gap-8">
           {(userRole === 'admin' || userRole === 'dm') && (
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
               <InviteFriendsToGroup 
                 groupId={group.id} 
-                onMemberAdded={fetchGroupData}
+                onMemberAdded={handleMemberAdded}
               />
             </div>
           )}
