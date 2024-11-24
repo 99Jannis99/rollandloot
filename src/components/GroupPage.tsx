@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useUser } from "@clerk/clerk-react";
 import { supabase } from '../lib/supabase';
 import { GroupMembers } from './GroupMembers';
-import { GroupInventory } from './GroupInventory';
+import { GroupInventoryOverview } from './GroupInventoryOverview';
 import { InviteFriendsToGroup } from './InviteFriendsToGroup';
 import { syncUser } from '../services/userService';
 
@@ -109,17 +109,12 @@ export function GroupPage() {
             <h1 className="text-3xl font-bold mb-2">{group.name}</h1>
             <p className="text-gray-300">{group.description}</p>
           </div>
-          {userRole === 'admin' && (
-            <button className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-colors">
-              Edit Group
-            </button>
-          )}
         </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
-          <GroupInventory groupId={group.id} userRole={userRole} />
+          <GroupInventoryOverview groupId={group.id} />
         </div>
         <div className="flex flex-col gap-8">
           {(userRole === 'admin' || userRole === 'dm') && (

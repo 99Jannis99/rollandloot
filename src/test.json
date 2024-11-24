@@ -1,0 +1,65 @@
+[
+  {
+    "table_name": "custom_items",
+    "columns": [
+      "id",
+      "description",
+      "name",
+      "category",
+      "group_id",
+      "created_by",
+      "weight"
+    ]
+  },
+  {
+    "table_name": "group_inventories",
+    "columns": ["id", "inventory_id", "user_id", "group_id"]
+  },
+  {
+    "table_name": "group_members",
+    "columns": ["group_id", "user_id", "role", "id", "joined_at", "is_active"]
+  },
+  {
+    "table_name": "groups",
+    "columns": ["created_at", "id", "created_by", "name", "description"]
+  },
+  {
+    "table_name": "inventory_items",
+    "columns": [
+      "id",
+      "item_type",
+      "created_at",
+      "added_by",
+      "quantity",
+      "item_id",
+      "inventory_id"
+    ]
+  },
+  {
+    "table_name": "items",
+    "columns": ["name", "id", "description", "category", "weight"]
+  },
+  {
+    "table_name": "user_friends",
+    "columns": [
+      "user1_id",
+      "updated_at",
+      "created_at",
+      "status",
+      "user2_id",
+      "id"
+    ]
+  },
+  {
+    "table_name": "users",
+    "columns": [
+      "created_at",
+      "username",
+      "email",
+      "avatar_url",
+      "clerk_id",
+      "id",
+      "last_online"
+    ]
+  }
+]
