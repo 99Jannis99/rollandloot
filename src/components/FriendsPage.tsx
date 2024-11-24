@@ -9,8 +9,8 @@ export function FriendsPage() {
       
       <div className="grid md:grid-cols-2 gap-8">
         <div className="space-y-8">
-          <FriendRequests />
           <AddFriend />
+          <FriendRequests />
         </div>
         <FriendsList />
       </div>
