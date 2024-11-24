@@ -116,10 +116,21 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
               id="category"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent appearance-none"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                backgroundPosition: 'right 0.5rem center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '1.5em 1.5em',
+                paddingRight: '2.5rem'
+              }}
             >
               {categories.map(category => (
-                <option key={category} value={category}>
+                <option 
+                  key={category} 
+                  value={category}
+                  className="bg-gray-900 text-white"
+                >
                   {category.charAt(0).toUpperCase() + category.slice(1)}
                 </option>
               ))}
@@ -134,12 +145,23 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
               id="item"
               value={selectedItemId}
               onChange={(e) => setSelectedItemId(e.target.value)}
-              className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent appearance-none"
               required
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                backgroundPosition: 'right 0.5rem center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '1.5em 1.5em',
+                paddingRight: '2.5rem'
+              }}
             >
-              <option value="">Select an item...</option>
+              <option value="" className="bg-gray-900 text-gray-400">Select an item...</option>
               {filteredItems.map(item => (
-                <option key={item.id} value={item.id}>
+                <option 
+                  key={item.id} 
+                  value={item.id}
+                  className="bg-gray-900 text-white"
+                >
                   {item.name} ({item.category})
                 </option>
               ))}
