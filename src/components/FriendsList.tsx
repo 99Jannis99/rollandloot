@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { getFriendsList, removeFriend, FriendshipRequest } from '../services/friendshipService';
 import { syncUser } from '../services/userService';
+import { useFriendRequests } from '../contexts/FriendRequestContext';
 
 interface RemoveConfirmProps {
   friend: {
@@ -61,8 +62,8 @@ function RemoveConfirmDialog({ friend, onConfirm, onCancel, isDeleting }: Remove
 }
 
 export function FriendsList() {
+  const { friends, setFriends } = useFriendRequests();
   const { user } = useUser();
-  const [friends, setFriends] = useState<FriendshipRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,6 +72,10 @@ export function FriendsList() {
   const [confirmRemove, setConfirmRemove] = useState<{
     friendshipId: string;
     friend: { username: string; avatar_url: string; };
+  } | null>(null);
+  const [animatingFriendshipId, setAnimatingFriendshipId] = useState<{
+    id: string;
+    type: 'in' | 'out';
   } | null>(null);
 
   useEffect(() => {
@@ -95,15 +100,33 @@ export function FriendsList() {
   async function handleRemoveFriend(friendshipId: string) {
     try {
       setRemovingFriendId(friendshipId);
+      setAnimatingFriendshipId({ id: friendshipId, type: 'out' });
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       await removeFriend(friendshipId);
-      await loadFriends();
+      setFriends(prev => prev.filter(f => f.id !== friendshipId));
       setConfirmRemove(null);
     } catch (err: any) {
       setError('Failed to remove friend');
+      setAnimatingFriendshipId(null);
     } finally {
       setRemovingFriendId(null);
     }
   }
+
+  useEffect(() => {
+    if (friends.length > 0) {
+      const lastFriend = friends[friends.length - 1];
+      setAnimatingFriendshipId({ id: lastFriend.id, type: 'in' });
+      
+      const timer = setTimeout(() => {
+        setAnimatingFriendshipId(null);
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [friends.length]);
 
   const filteredFriends = friends.filter(friendship => {
     const friend = friendship.user1_id === supabaseUserId ? friendship.user2 : friendship.user1;
@@ -164,7 +187,13 @@ export function FriendsList() {
               return (
                 <div 
                   key={friendship.id}
-                  className="flex items-center justify-between p-4 bg-white/5 rounded-lg"
+                  className={`flex items-center justify-between p-4 bg-white/5 rounded-lg ${
+                    animatingFriendshipId?.id === friendship.id
+                      ? animatingFriendshipId.type === 'in'
+                        ? 'animate-slide-in'
+                        : 'animate-slide-out'
+                      : ''
+                  }`}
                 >
                   <div className="flex items-center space-x-4">
                     <img 

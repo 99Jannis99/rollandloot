@@ -2,14 +2,17 @@ import { useState } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { searchUsers, sendFriendRequest } from '../services/friendshipService';
 import { syncUser } from '../services/userService';
+import { useFriendRequests } from '../contexts/FriendRequestContext';
 
 interface SearchResult {
   id: string;
   username: string;
   avatar_url: string;
+  isAnimatingOut?: boolean;
 }
 
 export function AddFriend() {
+  const { addPendingRequest } = useFriendRequests();
   const { user } = useUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -44,12 +47,30 @@ export function AddFriend() {
     setSuccessMessage(null);
 
     try {
+      setSearchResults(prev => 
+        prev.map(result => 
+          result.id === friendId 
+            ? { ...result, isAnimatingOut: true }
+            : result
+        )
+      );
+
       const supabaseUser = await syncUser(user);
-      await sendFriendRequest(supabaseUser.id, friendId);
-      // Entferne den Benutzer aus den Suchergebnissen
+      const newRequest = await sendFriendRequest(supabaseUser.id, friendId);
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      addPendingRequest(newRequest);
       setSearchResults(prev => prev.filter(user => user.id !== friendId));
       setSuccessMessage(`Friend request sent to ${friendUsername}`);
     } catch (err: any) {
+      setSearchResults(prev => 
+        prev.map(result => 
+          result.id === friendId 
+            ? { ...result, isAnimatingOut: false }
+            : result
+        )
+      );
       setError(err.message || 'Failed to send friend request');
       console.error(err);
     }
@@ -88,11 +109,13 @@ export function AddFriend() {
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 relative">
         {searchResults.map((result) => (
           <div
             key={result.id}
-            className="flex items-center justify-between p-4 bg-white/5 rounded-lg"
+            className={`flex items-center justify-between p-4 bg-white/5 rounded-lg transition-all duration-500 ${
+              result.isAnimatingOut ? 'animate-slide-out' : ''
+            }`}
           >
             <div className="flex items-center space-x-4">
               <img
@@ -104,9 +127,10 @@ export function AddFriend() {
             </div>
             <button
               onClick={() => handleSendRequest(result.id, result.username)}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg"
+              disabled={result.isAnimatingOut}
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg disabled:opacity-50 transition-colors"
             >
-              Add Friend
+              {result.isAnimatingOut ? 'Sending...' : 'Add Friend'}
             </button>
           </div>
         ))}

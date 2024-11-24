@@ -3,17 +3,20 @@ import { useUser } from "@clerk/clerk-react";
 import { 
   getPendingRequests, 
   respondToFriendRequest,
+  cancelFriendRequest,
   FriendshipRequest 
 } from '../services/friendshipService';
 import { syncUser } from '../services/userService';
+import { useFriendRequests } from '../contexts/FriendRequestContext';
 
 export function FriendRequests() {
+  const { pendingRequests, setPendingRequests, addFriend, removePendingRequest } = useFriendRequests();
   const { user } = useUser();
-  const [requests, setRequests] = useState<FriendshipRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [responding, setResponding] = useState<string | null>(null);
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
+  const [animatingRequestId, setAnimatingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRequests();
@@ -25,11 +28,9 @@ export function FriendRequests() {
       setError(null);
       const supabaseUser = await syncUser(user);
       setSupabaseUserId(supabaseUser.id);
-      console.log('Current Supabase User:', supabaseUser);
       
-      const pendingRequests = await getPendingRequests(supabaseUser.id);
-      console.log('Pending Requests:', pendingRequests);
-      setRequests(pendingRequests);
+      const requests = await getPendingRequests(supabaseUser.id);
+      setPendingRequests(requests);
     } catch (error: any) {
       console.error('Error loading requests:', error);
       setError('Failed to load pending requests');
@@ -42,11 +43,40 @@ export function FriendRequests() {
     try {
       setError(null);
       setResponding(requestId);
-      await respondToFriendRequest(requestId, status);
-      await loadRequests();
+      setAnimatingRequestId(requestId);
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const updatedRequest = await respondToFriendRequest(requestId, status);
+      
+      if (status === 'accepted') {
+        addFriend(updatedRequest);
+      }
+      
+      removePendingRequest(requestId);
     } catch (error: any) {
       console.error('Error responding to request:', error);
       setError('Failed to respond to friend request');
+      setAnimatingRequestId(null);
+    } finally {
+      setResponding(null);
+    }
+  }
+
+  async function handleCancelRequest(requestId: string) {
+    try {
+      setResponding(requestId);
+      setError(null);
+      setAnimatingRequestId(requestId);
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await cancelFriendRequest(requestId);
+      await loadRequests();
+    } catch (error: any) {
+      console.error('Error canceling request:', error);
+      setError('Failed to cancel friend request');
+      setAnimatingRequestId(null);
     } finally {
       setResponding(null);
     }
@@ -64,31 +94,24 @@ export function FriendRequests() {
         </div>
       )}
 
-      {requests.length === 0 ? (
+      {pendingRequests.length === 0 ? (
         <p className="text-gray-400">No pending requests</p>
       ) : (
         <div className="grid gap-4">
-          {requests.map((request) => {
+          {pendingRequests.map((request) => {
             const isOutgoing = request.user1_id === supabaseUserId;
-            console.log('Request Debug:', {
-              requestId: request.id,
-              user1_id: request.user1_id,
-              user2_id: request.user2_id,
-              currentSupabaseUserId: supabaseUserId,
-              isOutgoing,
-              user1: request.user1,
-              user2: request.user2
-            });
-            
             const otherUser = isOutgoing ? request.user2 : request.user1;
-            console.log('Other User:', otherUser);
             
             if (!otherUser) return null;
             
             return (
               <div 
                 key={request.id}
-                className="flex items-center justify-between p-4 bg-white/5 rounded-lg"
+                className={`flex items-center justify-between p-4 bg-white/5 rounded-lg ${
+                  isOutgoing ? 'animate-slide-in' : ''
+                } ${
+                  animatingRequestId === request.id ? 'animate-slide-out' : ''
+                }`}
               >
                 <div className="flex items-center space-x-4">
                   <img 
@@ -103,19 +126,27 @@ export function FriendRequests() {
                     </span>
                   </div>
                 </div>
-                {!isOutgoing && (
+                {isOutgoing ? (
+                  <button
+                    onClick={() => handleCancelRequest(request.id)}
+                    disabled={responding === request.id}
+                    className="px-4 py-2 bg-red-600/10 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {responding === request.id ? 'Canceling...' : 'Cancel'}
+                  </button>
+                ) : (
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleResponse(request.id, 'accepted')}
                       disabled={responding === request.id}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
+                      className="px-4 py-2 bg-green-600/10 text-green-400 hover:bg-green-600/20 rounded-lg transition-colors disabled:opacity-50"
                     >
                       {responding === request.id ? 'Accepting...' : 'Accept'}
                     </button>
                     <button
                       onClick={() => handleResponse(request.id, 'rejected')}
                       disabled={responding === request.id}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50"
+                      className="px-4 py-2 bg-red-600/10 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors disabled:opacity-50"
                     >
                       {responding === request.id ? 'Declining...' : 'Decline'}
                     </button>

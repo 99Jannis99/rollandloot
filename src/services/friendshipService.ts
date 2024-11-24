@@ -136,4 +136,14 @@ export async function removeFriend(friendshipId: string): Promise<void> {
     .eq('id', friendshipId);
 
   if (error) throw error;
+}
+
+export async function cancelFriendRequest(requestId: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_friends')
+    .delete()
+    .eq('id', requestId)
+    .eq('status', 'pending');
+
+  if (error) throw error;
 } 
