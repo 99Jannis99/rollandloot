@@ -7,6 +7,8 @@ import { syncUser } from "../services/userService";
 import { FriendsList } from './FriendsList';
 import { FriendRequests } from './FriendRequests';
 import { AddFriend } from './AddFriend';
+import { EditGroupModal } from './EditGroupModal';
+import { PencilIcon } from './icons';
 
 interface GroupData {
   id: string;
@@ -29,6 +31,7 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -94,6 +97,20 @@ export function Dashboard() {
     setShowCreateModal(false);
   };
 
+  const handleGroupUpdated = (updatedGroup: Group) => {
+    setGroups(groups.map(g => 
+      g.id === updatedGroup.id 
+        ? { ...updatedGroup, role: g.role } 
+        : g
+    ));
+    setEditingGroup(null);
+  };
+
+  const handleGroupDeleted = () => {
+    setGroups(groups.filter(g => g.id !== editingGroup?.id));
+    setEditingGroup(null);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -133,24 +150,33 @@ export function Dashboard() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {groups.map((group) => (
-            <Link
+            <div
               key={group.id}
-              to={`/group/${group.id}`}
               className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors"
             >
               <div className="flex justify-between items-start">
-                <div>
+                <Link to={`/group/${group.id}`} className="flex-1">
                   <h3 className="text-xl font-semibold mb-2">{group.name}</h3>
                   <p className="text-gray-300 mb-4">{group.description}</p>
+                </Link>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-sm ${
+                    group.role === 'dm' ? 'bg-yellow-500/20 text-yellow-300' :
+                    'bg-blue-500/20 text-blue-300'
+                  }`}>
+                    {group.role === 'dm' ? 'DM' : 'Player'}
+                  </span>
+                  {(group.role === 'dm' || group.role === 'admin') && (
+                    <button
+                      onClick={() => setEditingGroup(group)}
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      <PencilIcon className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm ${
-                  group.role === 'dm' ? 'bg-yellow-500/20 text-yellow-300' :
-                  'bg-blue-500/20 text-blue-300'
-                }`}>
-                  {group.role === 'dm' ? 'DM' : 'Player'}
-                </span>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
 
@@ -166,6 +192,15 @@ export function Dashboard() {
         <CreateGroupModal
           onClose={() => setShowCreateModal(false)}
           onGroupCreated={handleGroupCreated}
+        />
+      )}
+
+      {editingGroup && (
+        <EditGroupModal
+          group={editingGroup}
+          onClose={() => setEditingGroup(null)}
+          onGroupUpdated={handleGroupUpdated}
+          onGroupDeleted={handleGroupDeleted}
         />
       )}
     </div>

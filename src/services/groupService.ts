@@ -78,3 +78,40 @@ export async function getGroupMembers(groupId: string): Promise<any[]> {
   if (error) throw error;
   return data || [];
 }
+
+export async function updateGroup(
+  groupId: string,
+  data: { name?: string; description?: string }
+): Promise<Group> {
+  const { data: updatedGroup, error } = await supabase
+    .from('groups')
+    .update(data)
+    .eq('id', groupId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return updatedGroup;
+}
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  // Transaktion starten
+  const { error: transactionError } = await supabase.rpc('delete_group_with_dependencies', {
+    p_group_id: groupId
+  });
+
+  if (transactionError) throw transactionError;
+}
+
+// Funktion zum Prüfen der Berechtigungen
+export async function canManageGroup(groupId: string, userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error) return false;
+  return ['admin', 'dm'].includes(data.role);
+}
