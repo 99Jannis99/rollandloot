@@ -32,55 +32,55 @@ export function GroupPage() {
   const [userRole, setUserRole] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchGroupData() {
-      try {
-        if (!user || !id) return;
+  async function fetchGroupData() {
+    try {
+      if (!user || !id) return;
 
-        // Sync user with Supabase
-        const supabaseUser = await syncUser(user);
+      // Sync user with Supabase
+      const supabaseUser = await syncUser(user);
 
-        // Fetch group details
-        const { data: groupData, error: groupError } = await supabase
-          .from('groups')
-          .select('*')
-          .eq('id', id)
-          .single();
+      // Fetch group details
+      const { data: groupData, error: groupError } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-        if (groupError) throw groupError;
-        setGroup(groupData);
+      if (groupError) throw groupError;
+      setGroup(groupData);
 
-        // Fetch group members with their user details
-        const { data: membersData, error: membersError } = await supabase
-          .from('group_members')
-          .select(`
-            id,
-            user_id,
-            role,
-            users (
-              username,
-              avatar_url
-            )
-          `)
-          .eq('group_id', id);
+      // Fetch group members with their user details
+      const { data: membersData, error: membersError } = await supabase
+        .from('group_members')
+        .select(`
+          id,
+          user_id,
+          role,
+          users (
+            username,
+            avatar_url
+          )
+        `)
+        .eq('group_id', id);
 
-        if (membersError) throw membersError;
-        setMembers(membersData);
+      if (membersError) throw membersError;
+      setMembers(membersData);
 
-        // Find current user's role
-        const currentMember = membersData.find(
-          member => member.user_id === supabaseUser.id
-        );
-        if (currentMember) {
-          setUserRole(currentMember.role);
-        }
-      } catch (error) {
-        console.error('Error fetching group data:', error);
-      } finally {
-        setLoading(false);
+      // Find current user's role
+      const currentMember = membersData.find(
+        member => member.user_id === supabaseUser.id
+      );
+      if (currentMember) {
+        setUserRole(currentMember.role);
       }
+    } catch (error) {
+      console.error('Error fetching group data:', error);
+    } finally {
+      setLoading(false);
     }
+  }
 
+  useEffect(() => {
     fetchGroupData();
   }, [id, user]);
 
@@ -119,7 +119,10 @@ export function GroupPage() {
         <div className="flex flex-col gap-8">
           {(userRole === 'admin' || userRole === 'dm') && (
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-              <InviteFriendsToGroup groupId={group.id} />
+              <InviteFriendsToGroup 
+                groupId={group.id} 
+                onMemberAdded={fetchGroupData}
+              />
             </div>
           )}
           <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">

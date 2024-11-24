@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 interface Member {
@@ -21,6 +21,23 @@ interface GroupMembersProps {
 export function GroupMembers({ members, groupId, userRole, onMembersUpdate }: GroupMembersProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [animatingMemberId, setAnimatingMemberId] = useState<string | null>(null);
+  const prevMembersLength = useRef(members.length);
+
+  useEffect(() => {
+    // Nur animieren wenn ein neues Mitglied hinzugefügt wurde
+    if (members.length > prevMembersLength.current) {
+      const newMember = members[members.length - 1];
+      setAnimatingMemberId(newMember.id);
+      
+      const timer = setTimeout(() => {
+        setAnimatingMemberId(null);
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+    prevMembersLength.current = members.length;
+  }, [members.length]);
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
@@ -49,7 +66,9 @@ export function GroupMembers({ members, groupId, userRole, onMembersUpdate }: Gr
         {members.map((member) => (
           <div
             key={member.id}
-            className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+            className={`flex items-center justify-between p-3 bg-white/5 rounded-lg transition-all duration-500 ${
+              animatingMemberId === member.id ? 'animate-slide-in' : ''
+            }`}
           >
             <div className="flex items-center space-x-3">
               <img

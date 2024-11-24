@@ -6,6 +6,7 @@ import { inviteToGroup, getGroupMembers } from '../services/groupService';
 
 interface InviteFriendsToGroupProps {
   groupId: string;
+  onMemberAdded?: () => void;
 }
 
 interface Friend {
@@ -14,13 +15,14 @@ interface Friend {
   avatar_url: string;
 }
 
-export function InviteFriendsToGroup({ groupId }: InviteFriendsToGroupProps) {
+export function InviteFriendsToGroup({ groupId, onMemberAdded }: InviteFriendsToGroupProps) {
   const { user } = useUser();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
+  const [animatingFriendId, setAnimatingFriendId] = useState<string | null>(null);
 
   async function loadFriends() {
     if (!user) return;
@@ -74,14 +76,22 @@ export function InviteFriendsToGroup({ groupId }: InviteFriendsToGroupProps) {
       setInvitingFriendId(friendId);
       setError(null);
       setSuccessMessage(null);
+      setAnimatingFriendId(friendId);
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       await inviteToGroup(groupId, friendId);
       
       setSuccessMessage(`Invited ${friendUsername} to the group`);
       // Entferne den eingeladenen Freund aus der Liste
       setFriends(prev => prev.filter(f => f.id !== friendId));
+      
+      // Benachrichtige die übergeordnete Komponente
+      onMemberAdded?.();
+      
     } catch (err: any) {
       setError(err.message || 'Failed to invite friend');
+      setAnimatingFriendId(null);
       console.error(err);
     } finally {
       setInvitingFriendId(null);
@@ -115,7 +125,9 @@ export function InviteFriendsToGroup({ groupId }: InviteFriendsToGroupProps) {
           {friends.map((friend) => (
             <div
               key={friend.id}
-              className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+              className={`flex items-center justify-between p-3 bg-white/5 rounded-lg transition-all duration-500 ${
+                animatingFriendId === friend.id ? 'animate-slide-out' : ''
+              }`}
             >
               <div className="flex items-center space-x-3">
                 <img
