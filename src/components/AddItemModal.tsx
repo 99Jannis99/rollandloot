@@ -80,7 +80,7 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div 
         className="relative bg-gray-900 rounded-xl p-6 w-full max-w-md border border-white/10"
         onClick={e => e.stopPropagation()}
