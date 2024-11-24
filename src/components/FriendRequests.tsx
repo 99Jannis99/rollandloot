@@ -82,6 +82,12 @@ export function FriendRequests() {
     }
   }
 
+  const truncateUsername = (username: string, maxLength: number = 15) => {
+    return username.length > maxLength 
+      ? username.slice(0, maxLength) + '...'
+      : username;
+  };
+
   if (loading) return <div>Loading pending requests...</div>;
 
   return (
@@ -120,7 +126,12 @@ export function FriendRequests() {
                     className="w-10 h-10 rounded-full"
                   />
                   <div className="flex flex-col">
-                    <span className="font-medium">{otherUser.username}</span>
+                    <span 
+                      className="font-medium"
+                      title={otherUser.username}
+                    >
+                      {truncateUsername(otherUser.username)}
+                    </span>
                     <span className="text-sm text-yellow-400">
                       {isOutgoing ? 'Request sent' : 'Incoming request'}
                     </span>

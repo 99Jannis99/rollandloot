@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { searchUsers, sendFriendRequest } from '../services/friendshipService';
 import { syncUser } from '../services/userService';
@@ -11,6 +11,51 @@ interface SearchResult {
   isAnimatingOut?: boolean;
 }
 
+interface TooltipProps {
+  text: string;
+  children: React.ReactNode;
+}
+
+function Tooltip({ text, children }: TooltipProps) {
+  const [show, setShow] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (tooltipRef.current) {
+      const offset = 10; // Abstand vom Cursor
+      setPosition({
+        x: e.clientX + offset,
+        y: e.clientY + offset
+      });
+    }
+  };
+
+  return (
+    <div
+      className="relative inline-block"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      onMouseMove={handleMouseMove}
+    >
+      {children}
+      {show && text.length > 15 && (
+        <div
+          ref={tooltipRef}
+          className="fixed z-50 px-2 py-1 text-sm bg-gray-900 text-white rounded shadow-lg border border-white/10"
+          style={{
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            pointerEvents: 'none'
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AddFriend() {
   const { addPendingRequest } = useFriendRequests();
   const { user } = useUser();
@@ -19,6 +64,12 @@ export function AddFriend() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const truncateUsername = (username: string, maxLength: number = 15) => {
+    return username.length > maxLength 
+      ? username.slice(0, maxLength) + '...'
+      : username;
+  };
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -123,7 +174,11 @@ export function AddFriend() {
                 alt={result.username}
                 className="w-10 h-10 rounded-full"
               />
-              <span className="font-medium">{result.username}</span>
+              <Tooltip text={result.username}>
+                <span className="font-medium">
+                  {truncateUsername(result.username)}
+                </span>
+              </Tooltip>
             </div>
             <button
               onClick={() => handleSendRequest(result.id, result.username)}

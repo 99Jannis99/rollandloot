@@ -15,6 +15,12 @@ interface RemoveConfirmProps {
 }
 
 function RemoveConfirmDialog({ friend, onConfirm, onCancel, isDeleting }: RemoveConfirmProps) {
+  const truncateUsername = (username: string, maxLength: number = 15) => {
+    return username.length > maxLength 
+      ? username.slice(0, maxLength) + '...'
+      : username;
+  };
+
   return (
     <div className="flex flex-col items-center text-center gap-4">
       <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
@@ -36,7 +42,7 @@ function RemoveConfirmDialog({ friend, onConfirm, onCancel, isDeleting }: Remove
       <div>
         <h3 className="text-xl font-bold mb-2">Remove Friend</h3>
         <p className="text-gray-300">
-          Are you sure you want to remove <span className="font-semibold">{friend.username}</span>? 
+          Are you sure you want to remove <span className="font-semibold" title={friend.username}>{truncateUsername(friend.username)}</span>? 
           You will need to send a new friend request if you want to be friends again.
         </p>
       </div>
@@ -133,6 +139,12 @@ export function FriendsList() {
     return friend?.username.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  const truncateUsername = (username: string, maxLength: number = 15) => {
+    return username.length > maxLength 
+      ? username.slice(0, maxLength) + '...'
+      : username;
+  };
+
   if (loading) {
     return <div>Loading friends...</div>;
   }
@@ -201,7 +213,12 @@ export function FriendsList() {
                       alt={friend.username}
                       className="w-10 h-10 rounded-full"
                     />
-                    <span className="font-medium">{friend.username}</span>
+                    <span 
+                      className="font-medium"
+                      title={friend.username}
+                    >
+                      {truncateUsername(friend.username)}
+                    </span>
                   </div>
                   <button
                     onClick={() => setConfirmRemove({ 
