@@ -63,8 +63,8 @@ export async function getPendingRequests(userId: string): Promise<FriendshipRequ
       user1:users!user_friends_user1_id_fkey (username, avatar_url),
       user2:users!user_friends_user2_id_fkey (username, avatar_url)
     `)
-    .eq('user2_id', userId)
-    .eq('status', 'pending');
+    .eq('status', 'pending')
+    .or(`user2_id.eq.${userId},user1_id.eq.${userId}`);
 
   if (error) throw error;
   return data || [];

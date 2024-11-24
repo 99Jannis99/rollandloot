@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from "@clerk/clerk-react";
 import { 
   getPendingRequests, 
   respondToFriendRequest,
@@ -13,6 +13,7 @@ export function FriendRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [responding, setResponding] = useState<string | null>(null);
+  const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRequests();
@@ -23,11 +24,15 @@ export function FriendRequests() {
     try {
       setError(null);
       const supabaseUser = await syncUser(user);
+      setSupabaseUserId(supabaseUser.id);
+      console.log('Current Supabase User:', supabaseUser);
+      
       const pendingRequests = await getPendingRequests(supabaseUser.id);
+      console.log('Pending Requests:', pendingRequests);
       setRequests(pendingRequests);
     } catch (error: any) {
       console.error('Error loading requests:', error);
-      setError('Failed to load friend requests');
+      setError('Failed to load pending requests');
     } finally {
       setLoading(false);
     }
@@ -38,7 +43,6 @@ export function FriendRequests() {
       setError(null);
       setResponding(requestId);
       await respondToFriendRequest(requestId, status);
-      // Aktualisiere die Liste nach der Antwort
       await loadRequests();
     } catch (error: any) {
       console.error('Error responding to request:', error);
@@ -48,11 +52,11 @@ export function FriendRequests() {
     }
   }
 
-  if (loading) return <div>Loading requests...</div>;
+  if (loading) return <div>Loading pending requests...</div>;
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Friend Requests</h2>
+      <h2 className="text-xl font-semibold">Pending</h2>
       
       {error && (
         <div className="text-red-400 text-sm p-2 bg-red-500/10 rounded-lg">
@@ -65,8 +69,21 @@ export function FriendRequests() {
       ) : (
         <div className="grid gap-4">
           {requests.map((request) => {
-            const sender = request.user1;
-            const isResponding = responding === request.id;
+            const isOutgoing = request.user1_id === supabaseUserId;
+            console.log('Request Debug:', {
+              requestId: request.id,
+              user1_id: request.user1_id,
+              user2_id: request.user2_id,
+              currentSupabaseUserId: supabaseUserId,
+              isOutgoing,
+              user1: request.user1,
+              user2: request.user2
+            });
+            
+            const otherUser = isOutgoing ? request.user2 : request.user1;
+            console.log('Other User:', otherUser);
+            
+            if (!otherUser) return null;
             
             return (
               <div 
@@ -75,28 +92,35 @@ export function FriendRequests() {
               >
                 <div className="flex items-center space-x-4">
                   <img 
-                    src={sender?.avatar_url} 
-                    alt={sender?.username}
+                    src={otherUser.avatar_url} 
+                    alt={otherUser.username}
                     className="w-10 h-10 rounded-full"
                   />
-                  <span className="font-medium">{sender?.username}</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{otherUser.username}</span>
+                    <span className="text-sm text-yellow-400">
+                      {isOutgoing ? 'Request sent' : 'Incoming request'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleResponse(request.id, 'accepted')}
-                    disabled={isResponding}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
-                  >
-                    {isResponding ? 'Accepting...' : 'Accept'}
-                  </button>
-                  <button
-                    onClick={() => handleResponse(request.id, 'rejected')}
-                    disabled={isResponding}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50"
-                  >
-                    {isResponding ? 'Declining...' : 'Decline'}
-                  </button>
-                </div>
+                {!isOutgoing && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleResponse(request.id, 'accepted')}
+                      disabled={responding === request.id}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
+                    >
+                      {responding === request.id ? 'Accepting...' : 'Accept'}
+                    </button>
+                    <button
+                      onClick={() => handleResponse(request.id, 'rejected')}
+                      disabled={responding === request.id}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50"
+                    >
+                      {responding === request.id ? 'Declining...' : 'Decline'}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
