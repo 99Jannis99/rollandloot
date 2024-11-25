@@ -305,15 +305,27 @@ export async function updateGroup(
   groupId: string,
   data: { name?: string; description?: string }
 ): Promise<Group> {
-  const { data: updatedGroup, error } = await supabase
-    .from('groups')
-    .update(data)
-    .eq('id', groupId)
-    .select()
-    .single();
+  try {
+    const { data: updatedGroup, error } = await supabase.rpc('update_group', {
+      p_group_id: groupId,
+      p_name: data.name,
+      p_description: data.description
+    });
 
-  if (error) throw error;
-  return updatedGroup;
+    if (error) {
+      console.error('Error updating group:', error);
+      throw error;
+    }
+
+    if (!updatedGroup) {
+      throw new Error('Group not found');
+    }
+
+    return updatedGroup as Group;
+  } catch (error) {
+    console.error('Error in updateGroup:', error);
+    throw error;
+  }
 }
 
 export async function deleteGroup(groupId: string): Promise<void> {
