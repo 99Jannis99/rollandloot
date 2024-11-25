@@ -108,19 +108,23 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <img
-                  src={inventory.user?.avatar_url}
-                  alt={inventory.user?.username}
-                  className="w-10 h-10 rounded-full"
-                />
-                <h3 
-                  className="text-lg font-semibold"
-                  title={`${inventory.user?.username}'s Inventory`} // Vollständiger Name als Tooltip
-                >
-                  {inventory.user?.username 
-                    ? `${truncateUsername(inventory.user.username)}'s Inventory`
-                    : 'Unknown User\'s Inventory'}
-                </h3>
+                {isDM && (
+                  <>
+                    <img
+                      src={inventory.user?.avatar_url}
+                      alt={inventory.user?.username}
+                      className="w-10 h-10 rounded-full"
+                    />
+                    <h3 
+                      className="text-lg font-semibold"
+                      title={`${inventory.user?.username}'s Inventory`}
+                    >
+                      {inventory.user?.username 
+                        ? `${truncateUsername(inventory.user.username)}'s Inventory`
+                        : 'Unknown User\'s Inventory'}
+                    </h3>
+                  </>
+                )}
               </div>
               {isDM && (
                 <button
