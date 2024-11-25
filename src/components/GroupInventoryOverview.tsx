@@ -144,6 +144,7 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
               isDM={isDM}
               userId={inventory.user_id}
               onItemRemoved={() => loadInventories()}
+              onItemUpdated={() => loadInventories()}
             />
           </div>
         ))}

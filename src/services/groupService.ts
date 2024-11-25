@@ -447,3 +447,27 @@ export async function updateUserRole(groupId: string, userId: string, newRole: '
     throw error;
   }
 }
+
+export async function updateItemQuantity(
+  itemId: string,
+  quantityChange: number,
+  userId: string,
+  isDM: boolean
+): Promise<void> {
+  try {
+    const { error } = await supabase.rpc('update_item_quantity', {
+      p_item_id: itemId,
+      p_quantity_change: quantityChange,
+      p_user_id: userId,
+      p_is_dm: isDM
+    });
+
+    if (error) {
+      console.error('Error in update_item_quantity:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error updating item quantity:', error);
+    throw error;
+  }
+}
