@@ -42,7 +42,8 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
 
       if (dmCheck) {
         const allInventories = await getAllGroupInventories(groupId);
-        setInventories(allInventories);
+        const filteredInventories = allInventories.filter(inv => inv.user_id !== supabaseUser.id);
+        setInventories(filteredInventories);
       } else {
         const playerInventory = await getPlayerInventory(groupId, supabaseUser.id);
         if (playerInventory) {
