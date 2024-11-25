@@ -69,6 +69,19 @@ export function InviteFriendsToGroup({ groupId, onMemberAdded }: InviteFriendsTo
     loadFriends();
   }, [user, groupId]);
 
+  // Hilfsfunktion zum Kürzen von Benutzernamen
+  const truncateUsername = (username: string, maxLength: number = 15) => {
+    return username.length > maxLength 
+      ? username.slice(0, maxLength) + '...'
+      : username;
+  };
+
+  // Hilfsfunktion für Erfolgsmeldungen mit gekürztem Namen
+  const createSuccessMessage = (username: string) => {
+    const truncatedName = truncateUsername(username, 20); // Längere Grenze für Nachrichten
+    return `Invited ${truncatedName} to the group`;
+  };
+
   async function handleInvite(friendId: string, friendUsername: string) {
     if (!user) return;
     
@@ -82,11 +95,9 @@ export function InviteFriendsToGroup({ groupId, onMemberAdded }: InviteFriendsTo
       
       await inviteToGroup(groupId, friendId);
       
-      setSuccessMessage(`Invited ${friendUsername} to the group`);
-      // Entferne den eingeladenen Freund aus der Liste
+      setSuccessMessage(createSuccessMessage(friendUsername));
       setFriends(prev => prev.filter(f => f.id !== friendId));
       
-      // Benachrichtige die übergeordnete Komponente
       onMemberAdded?.();
       
     } catch (err: any) {
@@ -135,7 +146,9 @@ export function InviteFriendsToGroup({ groupId, onMemberAdded }: InviteFriendsTo
                   alt={friend.username}
                   className="w-8 h-8 rounded-full"
                 />
-                <span>{friend.username}</span>
+                <span title={friend.username}>
+                  {truncateUsername(friend.username)}
+                </span>
               </div>
               <button
                 onClick={() => handleInvite(friend.id, friend.username)}

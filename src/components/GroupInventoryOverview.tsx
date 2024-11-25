@@ -71,6 +71,13 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
     setSelectedPlayerId(null);
   };
 
+  // Hilfsfunktion zum Kürzen von Benutzernamen
+  const truncateUsername = (username: string, maxLength: number = 15) => {
+    return username.length > maxLength 
+      ? username.slice(0, maxLength) + '...'
+      : username;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -106,8 +113,13 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
                   alt={inventory.user?.username}
                   className="w-10 h-10 rounded-full"
                 />
-                <h3 className="text-lg font-semibold">
-                  {inventory.user?.username}'s Inventory
+                <h3 
+                  className="text-lg font-semibold"
+                  title={`${inventory.user?.username}'s Inventory`} // Vollständiger Name als Tooltip
+                >
+                  {inventory.user?.username 
+                    ? `${truncateUsername(inventory.user.username)}'s Inventory`
+                    : 'Unknown User\'s Inventory'}
                 </h3>
               </div>
               {isDM && (
