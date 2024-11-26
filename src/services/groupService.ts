@@ -42,6 +42,15 @@ export interface GroupInventory {
   }[];
 }
 
+export interface Item {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  weight: number;
+  icon_url: string;
+}
+
 export async function getAllGroupInventories(groupId: string): Promise<GroupInventory[]> {
   const { data: members, error: membersError } = await supabase
     .from('group_members')
@@ -176,10 +185,8 @@ export async function getPlayerInventory(groupId: string, userId: string): Promi
 export async function addItemToPlayerInventory(
   groupId: string,
   playerId: string,
-  itemData: {
-    itemId: string;
-    quantity: number;
-  }
+  itemId: string,
+  quantity: number
 ): Promise<void> {
   try {
     // Prüfe zuerst, ob der Spieler DM ist
@@ -215,8 +222,8 @@ export async function addItemToPlayerInventory(
       .from('inventory_items')
       .insert([{
         inventory_id: inventory.id,
-        item_id: itemData.itemId,
-        quantity: itemData.quantity,
+        item_id: itemId,
+        quantity: quantity,
         added_by: playerId,
         item_type: 'custom'
       }]);
@@ -471,6 +478,27 @@ export async function updateItemQuantity(
     }
   } catch (error) {
     console.error('Error updating item quantity:', error);
+    throw error;
+  }
+}
+
+export async function searchItems(searchTerm: string): Promise<Item[]> {
+  try {
+    const { data: items, error } = await supabase
+      .from('items')
+      .select('*')
+      .ilike('name', `%${searchTerm}%`)
+      .order('name')
+      .limit(10);
+
+    if (error) {
+      console.error('Error searching items:', error);
+      throw error;
+    }
+
+    return items || [];
+  } catch (error) {
+    console.error('Error searching items:', error);
     throw error;
   }
 }
