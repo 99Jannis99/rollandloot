@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { removeItemFromInventory, updateItemQuantity } from '../services/groupService';
 import { PlusIcon, MinusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import InfoIcon from '/icons/info.svg';
 
 interface Item {
   id: string;
@@ -14,6 +15,10 @@ interface Item {
     weight: number;
     icon_url: string;
   };
+}
+
+interface ItemWithShowInfo extends Item {
+  showInfo?: boolean;
 }
 
 interface ItemListProps {
@@ -34,6 +39,9 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
     return initialInputs;
   });
   const [updating, setUpdating] = useState<string | null>(null);
+  const [itemsState, setItemsState] = useState<ItemWithShowInfo[]>(
+    items.map(item => ({ ...item, showInfo: false }))
+  );
 
   useEffect(() => {
     setQuantityInputs(prev => {
@@ -77,12 +85,20 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
     }
   }
 
+  const toggleItemInfo = (index: number) => {
+    setItemsState(prevItems => 
+      prevItems.map((item, i) => 
+        i === index ? { ...item, showInfo: !item.showInfo } : item
+      )
+    );
+  };
+
   return (
     <div className="space-y-3">
       {items.length === 0 ? (
         <p className="text-gray-400 text-center py-4">No items in inventory</p>
       ) : (
-        items.map(item => (
+        items.map((item, index) => (
           <div 
             key={item.id}
             className="flex items-start gap-4 p-3 bg-black/20 rounded-lg"
@@ -108,9 +124,26 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <span className="font-medium">{item.items?.name || 'Unknown Item'}</span>
-                <span className="text-sm text-gray-400">Quantity: {item.quantity}</span>
+                <div className="flex items-center gap-2">
+                  {item.items?.description && (
+                    <button 
+                      onClick={() => toggleItemInfo(index)}
+                      className="info-icon-button"
+                    >
+                      <img
+                        src={InfoIcon}
+                        alt="Info"
+                        className="w-5 h-5"
+                        style={{ filter: 'invert(0.6)' }}
+                      />
+                    </button>
+                  )}
+                  <span className="text-sm text-gray-400">Quantity: {item.quantity}</span>
+                </div>
               </div>
-              <p className="text-sm text-gray-300 mt-1">{item.items?.description}</p>
+              {itemsState[index].showInfo && (
+                <p className="text-sm text-gray-300 mt-1">{item.items?.description}</p>
+              )}
               <div className="flex gap-4 mt-1 text-xs text-gray-400">
                 <span>Category: {item.items?.category}</span>
                 <span>Weight: {item.items?.weight}</span>
