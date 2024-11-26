@@ -12,6 +12,9 @@ import { syncUser } from '../services/userService';
 import { ItemList } from './ItemList';
 import { AddItemModal } from './AddItemModal';
 
+// Neuer Import für das Chevron Icon
+import ChevronIcon from '/icons/chevron.svg';
+
 interface GroupInventoryOverviewProps {
   groupId: string;
 }
@@ -24,6 +27,9 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
   const [isDM, setIsDM] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+
+  // Neuer state für collapsed inventories
+  const [collapsedInventories, setCollapsedInventories] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     loadInventories();
@@ -78,6 +84,14 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
       : username;
   };
 
+  // Funktion zum Umschalten des Collapse-Status
+  const toggleInventory = (inventoryId: string) => {
+    setCollapsedInventories(prev => ({
+      ...prev,
+      [inventoryId]: !prev[inventoryId]
+    }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -104,9 +118,12 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
         {inventories.map((inventory) => (
           <div
             key={inventory.id}
-            className="bg-white/5 rounded-lg p-6 space-y-4"
+            className="bg-white/5 rounded-lg overflow-hidden"
           >
-            <div className="flex items-center justify-between">
+            <div 
+              className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-colors"
+              onClick={() => toggleInventory(inventory.id)}
+            >
               <div className="flex items-center space-x-3">
                 {isDM && (
                   <>
@@ -126,26 +143,51 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
                   </>
                 )}
               </div>
-              {isDM && (
-                <button
-                  onClick={() => {
-                    setSelectedPlayerId(inventory.user_id);
-                    setShowAddItemModal(true);
-                  }}
-                  className="px-3 py-1 text-sm bg-violet-600/10 text-violet-400 hover:bg-violet-600/20 rounded-lg"
+              <div className="flex items-center gap-3">
+                {isDM && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPlayerId(inventory.user_id);
+                      setShowAddItemModal(true);
+                    }}
+                    className="px-3 py-1 text-sm bg-violet-600/10 text-violet-400 hover:bg-violet-600/20 rounded-lg"
+                  >
+                    Add Item
+                  </button>
+                )}
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  className={`w-5 h-5 transition-transform duration-200 text-gray-400 ${
+                    collapsedInventories[inventory.id] ? 'rotate-180' : ''
+                  }`}
                 >
-                  Add Item
-                </button>
-              )}
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
             </div>
 
-            <ItemList
-              items={inventory.inventory_items || []}
-              isDM={isDM}
-              userId={inventory.user_id}
-              onItemRemoved={() => loadInventories()}
-              onItemUpdated={() => loadInventories()}
-            />
+            <div
+              className={`transition-all duration-200 ease-in-out overflow-hidden ${
+                collapsedInventories[inventory.id] ? 'max-h-0' : 'max-h-[2000px]'
+              }`}
+            >
+              <div className="p-4">
+                <ItemList
+                  items={inventory.inventory_items || []}
+                  isDM={isDM}
+                  userId={inventory.user_id}
+                  onItemRemoved={() => loadInventories()}
+                  onItemUpdated={() => loadInventories()}
+                />
+              </div>
+            </div>
           </div>
         ))}
       </div>
