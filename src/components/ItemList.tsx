@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { removeItemFromInventory, updateItemQuantity } from '../services/groupService';
+import { PlusIcon, MinusIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface Item {
   id: string;
@@ -11,6 +12,7 @@ interface Item {
     description: string;
     category: string;
     weight: number;
+    icon_url: string;
   };
 }
 
@@ -83,8 +85,26 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
         items.map(item => (
           <div 
             key={item.id}
-            className="flex items-center justify-between p-3 bg-black/20 rounded-lg"
+            className="flex items-start gap-4 p-3 bg-black/20 rounded-lg"
           >
+            <div className="flex-shrink-0 mt-1">
+              {item.items?.icon_url && (
+                <>
+                  <img
+                    src={item.items.icon_url}
+                    alt={item.items?.name}
+                    className="w-8 h-8 text-white"
+                    style={{ filter: 'invert(1)' }}
+                    onError={(e) => {
+                      console.error(`Failed to load icon: ${item.items.icon_url}`);
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <div className="hidden">{`Icon URL: ${item.items.icon_url}`}</div>
+                </>
+              )}
+            </div>
+
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <span className="font-medium">{item.items?.name || 'Unknown Item'}</span>
@@ -116,7 +136,7 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
                     disabled={updating === item.id}
                     className="px-2 py-1 bg-green-600/10 text-green-400 hover:bg-green-600/20 rounded text-sm"
                   >
-                    +
+                    <PlusIcon className="w-4 h-4" />
                   </button>
                 )}
                 <button
@@ -124,7 +144,7 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
                   disabled={updating === item.id}
                   className="px-2 py-1 bg-yellow-600/10 text-yellow-400 hover:bg-yellow-600/20 rounded text-sm"
                 >
-                  -
+                  <MinusIcon className="w-4 h-4" />
                 </button>
               </div>
 
@@ -133,7 +153,7 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
                 disabled={deletingItemId === item.id}
                 className="px-3 py-1 text-sm bg-red-600/10 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors disabled:opacity-50"
               >
-                {deletingItemId === item.id ? 'Removing...' : 'Remove'}
+                {deletingItemId === item.id ? 'Removing...' : <TrashIcon className="w-4 h-4" />}
               </button>
             </div>
           </div>

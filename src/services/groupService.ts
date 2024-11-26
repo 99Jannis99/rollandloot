@@ -37,6 +37,7 @@ export interface GroupInventory {
       description: string;
       category: string;
       weight: number;
+      icon_url: string;
     };
   }[];
 }
@@ -86,7 +87,8 @@ export async function getAllGroupInventories(groupId: string): Promise<GroupInve
           name,
           description,
           category,
-          weight
+          weight,
+          icon_url
         )
       `)
       .eq('inventory_id', inventoryId);
@@ -141,7 +143,7 @@ export async function getPlayerInventory(groupId: string, userId: string): Promi
       return null;
     }
 
-    // 4. Hole die Inventar-Items
+    // 4. Hole die Inventar-Items mit icon_url
     const { data: items, error: itemsError } = await supabase
       .from('inventory_items')
       .select(`
@@ -153,7 +155,8 @@ export async function getPlayerInventory(groupId: string, userId: string): Promi
           name,
           description,
           category,
-          weight
+          weight,
+          icon_url
         )
       `)
       .eq('inventory_id', inventory.id);
