@@ -479,19 +479,16 @@ export async function updateItemQuantity(
   isDM: boolean
 ): Promise<void> {
   try {
-    const { error } = await supabase.rpc('update_item_quantity', {
-      p_item_id: itemId,
-      p_quantity_change: quantityChange,
-      p_user_id: userId,
-      p_is_dm: isDM
-    });
+    // Verwende die RPC-Funktion für das Update
+    const { error } = await supabase
+      .rpc('update_inventory_item_quantity', {
+        p_item_id: itemId,
+        p_quantity_change: quantityChange
+      });
 
-    if (error) {
-      console.error('Error in update_item_quantity:', error);
-      throw error;
-    }
+    if (error) throw error;
+
   } catch (error) {
-    console.error('Error updating item quantity:', error);
     throw error;
   }
 }
