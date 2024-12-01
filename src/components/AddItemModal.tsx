@@ -16,7 +16,7 @@ interface AddItemModalProps {
   groupId: string;
   playerId: string;
   onClose: () => void;
-  onItemAdded: () => void;
+  onItemAdded: (newItem: any) => void;
 }
 
 export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddItemModalProps) {
@@ -117,14 +117,16 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
     if (!selectedItem) return;
 
     try {
-      await addItemToPlayerInventory(
+      const newItem = await addItemToPlayerInventory(
         groupId,
         playerId,
         selectedItem.id,
         parseInt(quantity),
         selectedItem.is_custom || false
       );
-      onItemAdded();
+      
+      onItemAdded(newItem);
+      onClose();
     } catch (error) {
       console.error('Failed to add item:', error);
     }

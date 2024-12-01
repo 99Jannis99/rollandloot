@@ -32,7 +32,7 @@ export interface GroupInventory {
     id: string;
     item_id: string;
     quantity: number;
-    item_type: 'api' | 'custom';
+    item_type: 'standard' | 'custom';
     items: {
       id: string;
       name: string;
@@ -177,12 +177,11 @@ export async function addItemToPlayerInventory(
   groupId: string,
   playerId: string,
   itemId: string,
-  quantity: number = 1,
-  isCustomItem: boolean = false
+  quantity: number,
+  isCustom: boolean
 ) {
   try {
-    // Zuerst holen wir das Inventar des Spielers
-    const { data: inventory, error: inventoryError } = await supabase
+    const { data: inventoryData, error: inventoryError } = await supabase
       .from('group_inventories')
       .select('id')
       .eq('group_id', groupId)
@@ -190,47 +189,45 @@ export async function addItemToPlayerInventory(
       .single();
 
     if (inventoryError) throw inventoryError;
-    if (!inventory) throw new Error('Inventory not found');
 
-    // Prüfen, ob das Item existiert
-    const { data: itemExists, error: itemError } = await supabase
+    // Zuerst fügen wir das Item zum Inventar hinzu
+    const { data: newItem, error: insertError } = await supabase
+      .from('inventory_items')
+      .insert({
+        inventory_id: inventoryData.id,
+        item_id: itemId,
+        quantity: quantity,
+        item_type: isCustom ? 'custom' : 'api'
+      })
+      .select('id, item_id, quantity, item_type')
+      .single();
+
+    if (insertError) throw insertError;
+
+    // Hole die Item-Details aus der all_items Tabelle
+    const { data: itemDetails, error: itemError } = await supabase
       .from('all_items')
-      .select('*')
+      .select('id, name, description, category, weight, icon_url')
       .eq('id', itemId)
       .single();
 
-    if (itemError || !itemExists) {
-      throw new Error('Item nicht gefunden');
-    }
+    if (itemError) throw itemError;
 
-    // Item zum Inventar hinzufügen
-    const { data: addedItem, error: addError } = await supabase
-      .from('inventory_items')
-      .insert({
-        inventory_id: inventory.id,
-        item_id: itemId,
-        quantity: quantity,
-        item_type: isCustomItem ? 'custom' : 'api'
-      })
-      .select(`
-        id,
-        quantity,
-        item_id,
-        item_type,
-        items:all_items!inner(*)
-      `)
-      .single();
-
-    if (addError) throw addError;
-
+    // Kombiniere die Daten in das gewünschte Format
     return {
-      id: addedItem.id,
-      quantity: addedItem.quantity,
-      item_id: addedItem.item_id,
-      item_type: addedItem.item_type,
-      items: addedItem.items
+      id: newItem.id,
+      item_id: newItem.item_id,
+      quantity: newItem.quantity,
+      item_type: newItem.item_type,
+      items: {
+        id: itemDetails.id,
+        name: itemDetails.name,
+        description: itemDetails.description,
+        category: itemDetails.category,
+        weight: itemDetails.weight,
+        icon_url: itemDetails.icon_url
+      }
     };
-
   } catch (error) {
     console.error('Error adding item to inventory:', error);
     throw error;

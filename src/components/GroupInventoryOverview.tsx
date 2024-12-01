@@ -28,17 +28,13 @@ interface GroupInventoryOverviewProps {
 export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps) {
   const { user } = useUser();
   const [inventories, setInventories] = useState<GroupInventoryType[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDM, setIsDM] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showCreateItemModal, setShowCreateItemModal] = useState(false);
   const [showManageItemsModal, setShowManageItemsModal] = useState(false);
-
-  // Neuer state für collapsed inventories
   const [collapsedInventories, setCollapsedInventories] = useState<{ [key: string]: boolean }>({});
-
   const [inventoryCurrencies, setInventoryCurrencies] = useState<{ [key: string]: Currency[] }>({});
 
   // Funktion zum Laden der Währungen für ein Inventar
@@ -58,7 +54,6 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
     if (!user) return;
 
     try {
-      setLoading(true);
       setError(null);
       
       const supabaseUser = await syncUser(user);
@@ -70,7 +65,6 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
         const filteredInventories = allInventories.filter(inv => inv.user_id !== supabaseUser.id);
         setInventories(filteredInventories);
         
-        // Lade Währungen für jedes Inventar
         for (const inv of filteredInventories) {
           await loadCurrencies(inv.id);
         }
@@ -79,15 +73,11 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
         if (playerInventory) {
           setInventories([playerInventory]);
           await loadCurrencies(playerInventory.id);
-        } else {
-          setInventories([]);
         }
       }
     } catch (err: any) {
       console.error('Error loading inventories:', err);
       setError(err.message || 'Failed to load inventories');
-    } finally {
-      setLoading(false);
     }
   }, [groupId, user]);
 
@@ -100,8 +90,25 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
     setShowAddItemModal(true);
   };
 
-  const handleItemAdded = () => {
-    loadInventories();
+  const handleItemAdded = (newItem: any) => {
+    setInventories(prev => prev.map(inv => {
+      if (inv.user_id === selectedPlayerId) {
+        return {
+          ...inv,
+          inventory_items: [
+            ...inv.inventory_items || [],
+            {
+              id: newItem.id,
+              item_id: newItem.item_id,
+              quantity: newItem.quantity,
+              item_type: newItem.item_type,
+              items: newItem.items
+            }
+          ]
+        };
+      }
+      return inv;
+    }));
     setShowAddItemModal(false);
     setSelectedPlayerId(null);
   };
@@ -120,14 +127,6 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
       [inventoryId]: !prev[inventoryId]
     }));
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-lg text-gray-300">Loading inventories...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
