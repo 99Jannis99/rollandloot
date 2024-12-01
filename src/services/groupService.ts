@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { syncUser } from '../services/userService';
 
 export interface Group {
   id: string;
@@ -31,13 +32,14 @@ export interface GroupInventory {
     id: string;
     item_id: string;
     quantity: number;
+    item_type: 'api' | 'custom';
     items: {
       id: string;
       name: string;
       description: string;
       category: string;
       weight: number;
-      icon_url: string;
+      icon_url: string | null;
     };
   }[];
 }
@@ -52,87 +54,75 @@ export interface Item {
 }
 
 export async function getAllGroupInventories(groupId: string): Promise<GroupInventory[]> {
-  const { data: members, error: membersError } = await supabase
-    .from('group_members')
-    .select(`
-      user_id,
-      role,
-      users (
-        username,
-        avatar_url
-      )
-    `)
-    .eq('group_id', groupId)
-    .neq('role', 'dm');
-
-  if (membersError) throw membersError;
-
-  const inventories = await Promise.all((members || []).map(async (member) => {
-    if (member.role === 'dm') {
-      return null;
-    }
-
-    const { data: inventoryData } = await supabase
-      .from('group_inventories')
-      .select('id')
-      .eq('group_id', groupId)
-      .eq('user_id', member.user_id)
-      .single();
-
-    const inventoryId = inventoryData?.id;
-
-    if (!inventoryId) {
-      return null;
-    }
-
-    const { data: inventoryItems, error: itemsError } = await supabase
-      .from('inventory_items')
+  try {
+    const { data: members, error: membersError } = await supabase
+      .from('group_members')
       .select(`
-        id,
-        quantity,
-        item_id,
-        items (
-          id,
-          name,
-          description,
-          category,
-          weight,
-          icon_url
+        user_id,
+        role,
+        users (
+          username,
+          avatar_url
         )
       `)
-      .eq('inventory_id', inventoryId);
+      .eq('group_id', groupId)
+      .neq('role', 'dm');
 
-    if (itemsError) throw itemsError;
+    if (membersError) throw membersError;
 
-    return {
-      id: member.user_id,
-      user_id: member.user_id,
-      group_id: groupId,
-      user: member.users,
-      inventory_items: inventoryItems || []
-    };
-  }));
+    const inventories = await Promise.all((members || []).map(async (member) => {
+      if (member.role === 'dm') return null;
 
-  return inventories.filter((inv): inv is GroupInventory => inv !== null);
+      const { data: inventoryData } = await supabase
+        .from('group_inventories')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('user_id', member.user_id)
+        .single();
+
+      if (!inventoryData) return null;
+
+      const { data: inventoryItems } = await supabase
+        .from('inventory_items')
+        .select(`
+          id,
+          quantity,
+          item_id,
+          item_type,
+          items:all_items!inner(
+            id,
+            name,
+            description,
+            category,
+            weight,
+            icon_url
+          )
+        `)
+        .eq('inventory_id', inventoryData.id);
+
+      return {
+        id: member.user_id,
+        user_id: member.user_id,
+        group_id: groupId,
+        user: member.users,
+        inventory_items: inventoryItems || []
+      };
+    }));
+
+    return inventories.filter((inv): inv is GroupInventory => inv !== null);
+  } catch (error) {
+    console.error('Error in getAllGroupInventories:', error);
+    throw error;
+  }
 }
 
 export async function getPlayerInventory(groupId: string, userId: string): Promise<GroupInventory | null> {
   try {
-    // 1. Prüfe zuerst, ob der Benutzer DM ist
     const isDM = await isDungeonMaster(groupId, userId);
     if (isDM) {
-      // 2. Wenn DM, lösche alle vorhandenen Inventare
-      await supabase
-        .from('group_inventories')
-        .delete()
-        .match({
-          group_id: groupId,
-          user_id: userId
-        });
       return null;
     }
 
-    // 3. Für Nicht-DMs: Hole das vorhandene Inventar
     const { data: inventory, error } = await supabase
       .from('group_inventories')
       .select(`
@@ -148,18 +138,16 @@ export async function getPlayerInventory(groupId: string, userId: string): Promi
       .eq('user_id', userId)
       .single();
 
-    if (error || !inventory) {
-      return null;
-    }
+    if (error || !inventory) return null;
 
-    // 4. Hole die Inventar-Items mit icon_url
-    const { data: items, error: itemsError } = await supabase
+    const { data: inventoryItems } = await supabase
       .from('inventory_items')
       .select(`
         id,
         quantity,
         item_id,
-        items (
+        item_type,
+        items:all_items!inner(
           id,
           name,
           description,
@@ -170,11 +158,9 @@ export async function getPlayerInventory(groupId: string, userId: string): Promi
       `)
       .eq('inventory_id', inventory.id);
 
-    if (itemsError) throw itemsError;
-
     return {
       ...inventory,
-      inventory_items: items || []
+      inventory_items: inventoryItems || []
     };
   } catch (error) {
     console.error('Error in getPlayerInventory:', error);
@@ -186,51 +172,62 @@ export async function addItemToPlayerInventory(
   groupId: string,
   playerId: string,
   itemId: string,
-  quantity: number
-): Promise<void> {
+  quantity: number = 1,
+  isCustomItem: boolean = false
+) {
   try {
-    // Prüfe zuerst, ob der Spieler DM ist
-    const isDM = await isDungeonMaster(groupId, playerId);
-    if (isDM) {
-      throw new Error("DMs cannot have inventory items");
-    }
-
-    // First get or create the inventory
-    let { data: inventory } = await supabase
+    // Zuerst holen wir das Inventar des Spielers
+    const { data: inventory, error: inventoryError } = await supabase
       .from('group_inventories')
       .select('id')
       .eq('group_id', groupId)
       .eq('user_id', playerId)
       .single();
 
-    if (!inventory) {
-      const { data: newInventory, error: createError } = await supabase
-        .from('group_inventories')
-        .insert([{
-          group_id: groupId,
-          user_id: playerId,
-        }])
-        .select('id')
-        .single();
+    if (inventoryError) throw inventoryError;
+    if (!inventory) throw new Error('Inventory not found');
 
-      if (createError) throw createError;
-      inventory = newInventory;
+    // Prüfen, ob das Item existiert
+    const { data: itemExists, error: itemError } = await supabase
+      .from('all_items')
+      .select('*')
+      .eq('id', itemId)
+      .single();
+
+    if (itemError || !itemExists) {
+      throw new Error('Item nicht gefunden');
     }
 
-    // Then add the item to the inventory
-    const { error: addError } = await supabase
+    // Item zum Inventar hinzufügen
+    const { data: addedItem, error: addError } = await supabase
       .from('inventory_items')
-      .insert([{
+      .insert({
         inventory_id: inventory.id,
         item_id: itemId,
         quantity: quantity,
-        added_by: playerId,
-        item_type: 'custom'
-      }]);
+        item_type: isCustomItem ? 'custom' : 'api'
+      })
+      .select(`
+        id,
+        quantity,
+        item_id,
+        item_type,
+        items:all_items!inner(*)
+      `)
+      .single();
 
     if (addError) throw addError;
+
+    return {
+      id: addedItem.id,
+      quantity: addedItem.quantity,
+      item_id: addedItem.item_id,
+      item_type: addedItem.item_type,
+      items: addedItem.items
+    };
+
   } catch (error) {
-    console.error('Error adding item:', error);
+    console.error('Error adding item to inventory:', error);
     throw error;
   }
 }
@@ -482,23 +479,117 @@ export async function updateItemQuantity(
   }
 }
 
-export async function searchItems(searchTerm: string): Promise<Item[]> {
+export async function searchItems(searchTerm: string, groupId: string): Promise<Item[]> {
   try {
-    const { data: items, error } = await supabase
+    // Suche in der items Tabelle
+    const { data: standardItems, error: standardError } = await supabase
       .from('items')
       .select('*')
       .ilike('name', `%${searchTerm}%`)
-      .order('name')
-      .limit(10);
+      .order('name');
 
-    if (error) {
-      console.error('Error searching items:', error);
-      throw error;
-    }
+    if (standardError) throw standardError;
 
-    return items || [];
+    // Suche in der custom_items Tabelle
+    const { data: customItems, error: customError } = await supabase
+      .from('custom_items')
+      .select('*')
+      .eq('group_id', groupId)
+      .ilike('name', `%${searchTerm}%`)
+      .order('name');
+
+    if (customError) throw customError;
+
+    // Kombiniere die Ergebnisse
+    const allItems = [
+      ...(standardItems || []),
+      ...(customItems || []).map(item => ({
+        ...item,
+        is_custom: true  // Optional: Markiere custom items
+      }))
+    ];
+
+    // Sortiere nach Namen und limitiere auf 10 Ergebnisse
+    return allItems
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 10);
+
   } catch (error) {
     console.error('Error searching items:', error);
+    throw error;
+  }
+}
+
+export async function createCustomItem(
+  groupId: string,
+  clerkUserId: string,
+  itemData: {
+    name: string;
+    description: string;
+    category: string;
+    weight: number;
+  }
+): Promise<void> {
+  try {
+    // Hole direkt den Supabase User aus der users Tabelle
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('clerk_id', clerkUserId)
+      .single();
+
+    if (userError || !userData) {
+      console.error('Error fetching user:', userError);
+      throw new Error('User not found');
+    }
+
+    const { error } = await supabase
+      .from('custom_items')
+      .insert([{
+        ...itemData,
+        group_id: groupId,
+        created_by: userData.id
+      }]);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error creating custom item:', error);
+    throw error;
+  }
+}
+
+export async function getAvailableCategories(groupId: string): Promise<string[]> {
+  try {
+    // Hole Kategorien von Standard-Items
+    const { data: standardItems, error: standardError } = await supabase
+      .from('items')
+      .select('category')
+      .order('category');
+
+    if (standardError) throw standardError;
+
+    // Hole Kategorien von Custom-Items
+    const { data: customItems, error: customError } = await supabase
+      .from('custom_items')
+      .select('category')
+      .eq('group_id', groupId)
+      .order('category');
+
+    if (customError) throw customError;
+
+    // Kombiniere und entferne Duplikate
+    const allCategories = [
+      ...(standardItems || []).map(item => item.category),
+      ...(customItems || []).map(item => item.category)
+    ];
+
+    const uniqueCategories = [...new Set(allCategories)].filter(Boolean);
+    return uniqueCategories;
+  } catch (error) {
+    console.error('Error getting categories:', error);
     throw error;
   }
 }

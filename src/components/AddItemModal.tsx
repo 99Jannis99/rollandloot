@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { searchItems, addItemToPlayerInventory } from '../services/groupService';
+import { searchItems, addItemToPlayerInventory, getAvailableCategories } from '../services/groupService';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../lib/supabase';
 
@@ -9,6 +9,7 @@ interface Item {
   description: string;
   category: string;
   weight: number;
+  is_custom: boolean;
 }
 
 interface AddItemModalProps {
@@ -43,7 +44,7 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
       setLoading(true);
       searchTimeout.current = setTimeout(async () => {
         try {
-          const results = await searchItems(searchTerm);
+          const results = await searchItems(searchTerm, groupId);
           setSearchResults(results);
         } catch (error) {
           console.error('Failed to search items:', error);
@@ -54,24 +55,19 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
     } else {
       setSearchResults([]);
     }
-  }, [searchTerm]);
+  }, [searchTerm, groupId]);
 
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const { data: items } = await supabase
-          .from('items')
-          .select('category')
-          .order('category');
-        
-        const uniqueCategories = [...new Set(items?.map(item => item.category))];
-        setCategories(uniqueCategories);
+        const availableCategories = await getAvailableCategories(groupId);
+        setCategories(availableCategories);
       } catch (error) {
         console.error('Failed to load categories:', error);
       }
     };
     loadCategories();
-  }, []);
+  }, [groupId]);
 
   useEffect(() => {
     const loadItemsByCategory = async () => {
@@ -81,19 +77,34 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
       }
 
       try {
-        const { data: items } = await supabase
+        const { data: standardItems } = await supabase
           .from('items')
           .select('*')
           .eq('category', selectedCategory)
           .order('name');
-        
-        setItemsByCategory(items || []);
+
+        const { data: customItems } = await supabase
+          .from('custom_items')
+          .select('*')
+          .eq('group_id', groupId)
+          .eq('category', selectedCategory)
+          .order('name');
+
+        const allItems = [
+          ...(standardItems || []),
+          ...(customItems || []).map(item => ({
+            ...item,
+            is_custom: true
+          }))
+        ].sort((a, b) => a.name.localeCompare(b.name));
+
+        setItemsByCategory(allItems);
       } catch (error) {
         console.error('Failed to load items:', error);
       }
     };
     loadItemsByCategory();
-  }, [selectedCategory]);
+  }, [selectedCategory, groupId]);
 
   const handleItemSelect = (item: Item) => {
     setSelectedItem(item);
@@ -110,7 +121,8 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
         groupId,
         playerId,
         selectedItem.id,
-        parseInt(quantity)
+        parseInt(quantity),
+        selectedItem.is_custom || false
       );
       onItemAdded();
     } catch (error) {
@@ -156,8 +168,17 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
                     onClick={() => handleItemSelect(item)}
                     className="w-full px-4 py-2 text-left hover:bg-white/10 focus:bg-white/10 focus:outline-none transition-colors"
                   >
-                    <div className="font-medium">{item.name}</div>
-                    <div className="text-sm text-gray-400">{item.category}</div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{item.name}</div>
+                        <div className="text-sm text-gray-400">{item.category}</div>
+                      </div>
+                      {item.is_custom && (
+                        <span className="text-xs px-2 py-1 bg-violet-500/20 text-violet-300 rounded">
+                          Custom
+                        </span>
+                      )}
+                    </div>
                   </button>
                 ))}
               </div>

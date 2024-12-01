@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { 
   getAllGroupInventories, 
@@ -11,6 +11,7 @@ import {
 import { syncUser } from '../services/userService';
 import { ItemList } from './ItemList';
 import { AddItemModal } from './AddItemModal';
+import { CreateCustomItemModal } from './CreateCustomItemModal';
 
 // Neuer Import für das Chevron Icon
 import ChevronIcon from '/icons/chevron.svg';
@@ -27,15 +28,12 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
   const [isDM, setIsDM] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showCreateItemModal, setShowCreateItemModal] = useState(false);
 
   // Neuer state für collapsed inventories
   const [collapsedInventories, setCollapsedInventories] = useState<{ [key: string]: boolean }>({});
 
-  useEffect(() => {
-    loadInventories();
-  }, [groupId, user]);
-
-  async function loadInventories() {
+  const loadInventories = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -64,7 +62,11 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
     } finally {
       setLoading(false);
     }
-  }
+  }, [groupId, user]);
+
+  useEffect(() => {
+    loadInventories();
+  }, [loadInventories]);
 
   const handleAddItem = async () => {
     if (!selectedPlayerId) return;
@@ -106,6 +108,14 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
         <h2 className="text-2xl font-bold">
           {isDM ? 'Group Inventories' : 'Your Inventory'}
         </h2>
+        {isDM && (
+          <button
+            onClick={() => setShowCreateItemModal(true)}
+            className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            Create Custom Item
+          </button>
+        )}
       </div>
 
       {error && (
@@ -201,6 +211,18 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
             setSelectedPlayerId(null);
           }}
           onItemAdded={handleItemAdded}
+        />
+      )}
+
+      {showCreateItemModal && (
+        <CreateCustomItemModal
+          groupId={groupId}
+          userId={user?.id || ''}
+          onClose={() => setShowCreateItemModal(false)}
+          onItemCreated={() => {
+            setShowCreateItemModal(false);
+            // Optional: Aktualisieren Sie hier die Item-Liste
+          }}
         />
       )}
     </div>

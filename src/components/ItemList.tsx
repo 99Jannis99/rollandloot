@@ -7,13 +7,14 @@ interface Item {
   id: string;
   item_id: string;
   quantity: number;
+  item_type: 'standard' | 'custom';
   items: {
     id: string;
     name: string;
     description: string;
     category: string;
     weight: number;
-    icon_url: string;
+    icon_url: string | null;
   };
 }
 
