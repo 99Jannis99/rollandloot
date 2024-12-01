@@ -71,13 +71,16 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
       setDeletingItemId(itemId);
       setRemovingItemId(itemId);
       
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      await removeItemFromInventory(itemId, userId, isDM);
+      // Optimistic update
       onItemRemoved(itemId);
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await removeItemFromInventory(itemId, userId, isDM);
     } catch (error) {
       console.error('Failed to remove item:', error);
       setRemovingItemId(null);
+      // Bei Fehler UI zurücksetzen
+      onItemUpdated();
     } finally {
       setDeletingItemId(null);
     }
@@ -89,13 +92,27 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
       if (isNaN(quantity) || quantity <= 0) return;
 
       setUpdating(itemId);
-      await updateItemQuantity(itemId, change, userId, isDM);
       
-      setQuantityInputs(prev => ({ ...prev, [itemId]: "1" }));
+      // Optimistic update
+      const updatedItems = items.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            quantity: Math.max(0, item.quantity + change)
+          };
+        }
+        return item;
+      });
       
+      // Update UI sofort
       onItemUpdated();
+
+      // Dann Update in der Datenbank
+      await updateItemQuantity(itemId, change, userId, isDM);
     } catch (error) {
       console.error('Failed to update quantity:', error);
+      // Bei Fehler UI zurücksetzen
+      onItemUpdated();
     } finally {
       setUpdating(null);
     }

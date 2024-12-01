@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/clerk-react';
+import { supabase } from '../lib/supabase';
 import { 
   getAllGroupInventories, 
   getPlayerInventory,
@@ -38,7 +39,7 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
   const [inventoryCurrencies, setInventoryCurrencies] = useState<{ [key: string]: Currency[] }>({});
 
   // Funktion zum Laden der Währungen für ein Inventar
-  const loadCurrencies = async (inventoryId: string) => {
+  const loadCurrencies = useCallback(async (inventoryId: string) => {
     try {
       const currencies = await getInventoryCurrencies(inventoryId);
       setInventoryCurrencies(prev => ({
@@ -46,25 +47,23 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
         [inventoryId]: currencies
       }));
     } catch (error) {
-      console.error('Error loading currencies:', error);
+      setError('Failed to load currencies');
     }
-  };
+  }, []);
 
-  const loadInventories = useCallback(async () => {
+  // Zuerst die reloadInventoryData Funktion anpassen
+  const reloadInventoryData = useCallback(async () => {
     if (!user) return;
-
+    
     try {
-      setError(null);
-      
       const supabaseUser = await syncUser(user);
-      const dmCheck = await isDungeonMaster(groupId, supabaseUser.id);
-      setIsDM(dmCheck);
-
-      if (dmCheck) {
+      
+      if (isDM) {
         const allInventories = await getAllGroupInventories(groupId);
         const filteredInventories = allInventories.filter(inv => inv.user_id !== supabaseUser.id);
         setInventories(filteredInventories);
         
+        // Lade Währungen für alle Inventare
         for (const inv of filteredInventories) {
           await loadCurrencies(inv.id);
         }
@@ -72,18 +71,90 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
         const playerInventory = await getPlayerInventory(groupId, supabaseUser.id);
         if (playerInventory) {
           setInventories([playerInventory]);
+          // Lade Währungen für das Spieler-Inventar
           await loadCurrencies(playerInventory.id);
         }
       }
-    } catch (err: any) {
-      console.error('Error loading inventories:', err);
-      setError(err.message || 'Failed to load inventories');
+    } catch (error) {
+      setError('Failed to reload inventory data');
     }
-  }, [groupId, user]);
+  }, [user, groupId, isDM, loadCurrencies]);
 
+  // Dann die Realtime-Subscription anpassen
   useEffect(() => {
-    loadInventories();
-  }, [loadInventories]);
+    if (!user) return;
+
+    let isSubscribed = true;
+
+    const channel = supabase.channel('inventory_changes')
+      // Listener für inventory_items
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_items'
+        },
+        (payload) => {
+          // Synchrone Operation
+          if (isSubscribed) {
+            // Verwende requestAnimationFrame für das Update
+            requestAnimationFrame(() => {
+              if (isSubscribed) {
+                reloadInventoryData();
+              }
+            });
+          }
+          return false; // Wichtig: Immer false zurückgeben
+        }
+      )
+      // Listener für inventory_currencies
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_currencies'
+        },
+        (payload) => {
+          // Synchrone Operation
+          if (isSubscribed && payload.new?.inventory_id) {
+            // Verwende requestAnimationFrame für das Update
+            requestAnimationFrame(() => {
+              if (isSubscribed) {
+                loadCurrencies(payload.new!.inventory_id);
+              }
+            });
+          }
+          return false; // Wichtig: Immer false zurückgeben
+        }
+      )
+      .subscribe();
+
+    // Initiales Laden
+    const initializeData = async () => {
+      try {
+        const supabaseUser = await syncUser(user);
+        const dmCheck = await isDungeonMaster(groupId, supabaseUser.id);
+        setIsDM(dmCheck);
+        await reloadInventoryData();
+      } catch (error) {
+        setError('Failed to load initial data');
+      }
+    };
+
+    // Starte initiales Laden
+    requestAnimationFrame(() => {
+      if (isSubscribed) {
+        initializeData();
+      }
+    });
+
+    return () => {
+      isSubscribed = false;
+      channel.unsubscribe();
+    };
+  }, [user?.id, groupId, reloadInventoryData, loadCurrencies]);
 
   const handleAddItem = async () => {
     if (!selectedPlayerId) return;
@@ -91,24 +162,7 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
   };
 
   const handleItemAdded = (newItem: any) => {
-    setInventories(prev => prev.map(inv => {
-      if (inv.user_id === selectedPlayerId) {
-        return {
-          ...inv,
-          inventory_items: [
-            ...inv.inventory_items || [],
-            {
-              id: newItem.id,
-              item_id: newItem.item_id,
-              quantity: newItem.quantity,
-              item_type: newItem.item_type,
-              items: newItem.items
-            }
-          ]
-        };
-      }
-      return inv;
-    }));
+    reloadInventoryData();
     setShowAddItemModal(false);
     setSelectedPlayerId(null);
   };
@@ -244,8 +298,8 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
                   items={inventory.inventory_items || []}
                   isDM={isDM}
                   userId={inventory.user_id}
-                  onItemRemoved={() => loadInventories()}
-                  onItemUpdated={() => loadInventories()}
+                  onItemRemoved={reloadInventoryData}
+                  onItemUpdated={reloadInventoryData}
                 />
               </div>
             </div>
@@ -284,7 +338,7 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
           onClose={() => setShowManageItemsModal(false)}
           onItemUpdated={() => {
             setShowManageItemsModal(false);
-            loadInventories();
+            reloadInventoryData();
           }}
         />
       )}

@@ -239,17 +239,17 @@ export async function removeItemFromInventory(
   userId: string,
   isDM: boolean
 ): Promise<void> {
-  const query = supabase
-    .from('inventory_items')
-    .delete()
-    .eq('id', itemId);
+  try {
+    // Direkt das Item löschen, ohne weitere Überprüfungen
+    const { error } = await supabase
+      .from('inventory_items')
+      .delete()
+      .match({ id: itemId });
 
-  if (!isDM) {
-    query.eq('added_by', userId);
+    if (error) throw error;
+  } catch (error) {
+    throw error;
   }
-
-  const { error } = await query;
-  if (error) throw error;
 }
 
 export async function createGroup(name: string, description: string, userId: string): Promise<Group> {
@@ -779,4 +779,29 @@ export async function getInventoryCurrencies(
       { type: 'platinum', amount: 0 }
     ];
   }
+}
+
+export function subscribeToInventoryChanges(
+  inventoryIds: string[],
+  onUpdate: () => void
+) {
+  const channel = supabase
+    .channel('inventory-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_items',
+        filter: `inventory_id=in.(${inventoryIds.join(',')})`
+      },
+      () => {
+        onUpdate();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }

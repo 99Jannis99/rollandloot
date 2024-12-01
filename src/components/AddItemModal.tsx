@@ -117,7 +117,7 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
     if (!selectedItem) return;
 
     try {
-      const newItem = await addItemToPlayerInventory(
+      await addItemToPlayerInventory(
         groupId,
         playerId,
         selectedItem.id,
@@ -125,7 +125,7 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
         selectedItem.is_custom || false
       );
       
-      onItemAdded(newItem);
+      onItemAdded({});
       onClose();
     } catch (error) {
       console.error('Failed to add item:', error);

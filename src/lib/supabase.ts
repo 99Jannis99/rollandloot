@@ -9,5 +9,10 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   },
   auth: {
     persistSession: false
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 });
