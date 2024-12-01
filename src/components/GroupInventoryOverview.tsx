@@ -6,13 +6,17 @@ import {
   isDungeonMaster,
   GroupInventory as GroupInventoryType,
   addItemToPlayerInventory,
-  removeItemFromInventory
+  removeItemFromInventory,
+  getInventoryCurrencies,
+  updateInventoryCurrencies,
+  Currency
 } from '../services/groupService';
 import { syncUser } from '../services/userService';
 import { ItemList } from './ItemList';
 import { AddItemModal } from './AddItemModal';
 import { CreateCustomItemModal } from './CreateCustomItemModal';
 import { ManageCustomItemsModal } from './ManageCustomItemsModal';
+import { CurrencyDisplay } from './CurrencyDisplay';
 
 // Neuer Import für das Chevron Icon
 import ChevronIcon from '/icons/chevron.svg';
@@ -35,6 +39,21 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
   // Neuer state für collapsed inventories
   const [collapsedInventories, setCollapsedInventories] = useState<{ [key: string]: boolean }>({});
 
+  const [inventoryCurrencies, setInventoryCurrencies] = useState<{ [key: string]: Currency[] }>({});
+
+  // Funktion zum Laden der Währungen für ein Inventar
+  const loadCurrencies = async (inventoryId: string) => {
+    try {
+      const currencies = await getInventoryCurrencies(inventoryId);
+      setInventoryCurrencies(prev => ({
+        ...prev,
+        [inventoryId]: currencies
+      }));
+    } catch (error) {
+      console.error('Error loading currencies:', error);
+    }
+  };
+
   const loadInventories = useCallback(async () => {
     if (!user) return;
 
@@ -50,10 +69,16 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
         const allInventories = await getAllGroupInventories(groupId);
         const filteredInventories = allInventories.filter(inv => inv.user_id !== supabaseUser.id);
         setInventories(filteredInventories);
+        
+        // Lade Währungen für jedes Inventar
+        for (const inv of filteredInventories) {
+          await loadCurrencies(inv.id);
+        }
       } else {
         const playerInventory = await getPlayerInventory(groupId, supabaseUser.id);
         if (playerInventory) {
           setInventories([playerInventory]);
+          await loadCurrencies(playerInventory.id);
         } else {
           setInventories([]);
         }
@@ -199,6 +224,23 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
               }`}
             >
               <div className="p-4">
+                <CurrencyDisplay
+                  currencies={inventoryCurrencies[inventory.id] || [
+                    { type: 'copper', amount: 0 },
+                    { type: 'silver', amount: 0 },
+                    { type: 'gold', amount: 0 },
+                    { type: 'platinum', amount: 0 }
+                  ]}
+                  isDM={isDM}
+                  onUpdate={async (currencies) => {
+                    try {
+                      await updateInventoryCurrencies(inventory.id, currencies);
+                      await loadCurrencies(inventory.id);
+                    } catch (error) {
+                      console.error('Error updating currencies:', error);
+                    }
+                  }}
+                />
                 <ItemList
                   items={inventory.inventory_items || []}
                   isDM={isDM}

@@ -53,6 +53,11 @@ export interface Item {
   icon_url: string;
 }
 
+export interface Currency {
+  type: 'copper' | 'silver' | 'gold' | 'platinum';
+  amount: number;
+}
+
 export async function getAllGroupInventories(groupId: string): Promise<GroupInventory[]> {
   try {
     const { data: members, error: membersError } = await supabase
@@ -101,7 +106,7 @@ export async function getAllGroupInventories(groupId: string): Promise<GroupInve
         .eq('inventory_id', inventoryData.id);
 
       return {
-        id: member.user_id,
+        id: inventoryData.id,
         user_id: member.user_id,
         group_id: groupId,
         user: member.users,
@@ -345,16 +350,24 @@ export async function deleteGroup(groupId: string): Promise<void> {
 
 export async function inviteToGroup(groupId: string, userId: string) {
   try {
-    // Prüfe zuerst, ob der Benutzer bereits DM ist
-    const { data: existingMember } = await supabase
+    // Prüfe zuerst, ob der Benutzer bereits in der Gruppe ist
+    const { data: existingMember, error: checkError } = await supabase
       .from('group_members')
       .select('role')
       .eq('group_id', groupId)
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();  // Verwende maybeSingle statt single
 
+    if (checkError) throw checkError;
+
+    // Wenn der Benutzer bereits DM ist, verhindere die Einladung
     if (existingMember?.role === 'dm') {
       throw new Error('User is already a DM in this group');
+    }
+
+    // Wenn der Benutzer bereits Mitglied ist, beende hier
+    if (existingMember) {
+      throw new Error('User is already a member of this group');
     }
 
     // Füge das Mitglied zur Gruppe hinzu
@@ -363,23 +376,30 @@ export async function inviteToGroup(groupId: string, userId: string) {
       .insert([{
         group_id: groupId,
         user_id: userId,
-        role: 'player'
+        role: 'player',
+        is_active: true
       }])
       .select()
       .single();
 
     if (memberError) throw memberError;
 
-    // Nur für Spieler ein Inventar erstellen
-    if (memberData.role === 'player') {
-      const { error: inventoryError } = await supabase
-        .from('group_inventories')
-        .insert([{
-          group_id: groupId,
-          user_id: userId,
-        }]);
+    // Erstelle ein Inventar für den Spieler
+    const { error: inventoryError } = await supabase
+      .from('group_inventories')
+      .insert([{
+        group_id: groupId,
+        user_id: userId,
+      }]);
 
-      if (inventoryError) throw inventoryError;
+    if (inventoryError) {
+      // Wenn das Erstellen des Inventars fehlschlägt, entferne das Mitglied wieder
+      await supabase
+        .from('group_members')
+        .delete()
+        .match({ group_id: groupId, user_id: userId });
+      
+      throw inventoryError;
     }
 
     return memberData;
@@ -639,5 +659,127 @@ export async function updateCustomItem(groupId: string, item: {
   if (error) {
     console.error('Update error:', error);
     throw error;
+  }
+}
+
+export async function updateInventoryCurrencies(
+  inventoryId: string,
+  currencies: Currency[]
+): Promise<void> {
+  try {
+    // Zuerst prüfen, ob das Inventar existiert
+    const { data: inventoryExists } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('id', inventoryId)
+      .single();
+
+    if (!inventoryExists) {
+      console.warn('Inventory not found:', inventoryId);
+      return;
+    }
+
+    const currencyData = currencies.reduce((acc, curr) => {
+      acc[curr.type] = curr.amount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const { error } = await supabase
+      .from('inventory_currencies')
+      .upsert({
+        inventory_id: inventoryId,
+        ...currencyData
+      }, {
+        onConflict: 'inventory_id'
+      });
+
+    if (error) {
+      console.error('Error updating currencies:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error in updateInventoryCurrencies:', error);
+    throw error;
+  }
+}
+
+export async function getInventoryCurrencies(
+  inventoryId: string
+): Promise<Currency[]> {
+  try {
+    // Prüfe zuerst, ob das Inventar existiert
+    const { data: inventoryExists } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('id', inventoryId)
+      .single();
+
+    if (!inventoryExists) {
+      console.warn('Inventory not found:', inventoryId);
+      return [
+        { type: 'copper', amount: 0 },
+        { type: 'silver', amount: 0 },
+        { type: 'gold', amount: 0 },
+        { type: 'platinum', amount: 0 }
+      ];
+    }
+
+    const { data, error } = await supabase
+      .from('inventory_currencies')
+      .select('*')
+      .eq('inventory_id', inventoryId)
+      .maybeSingle();
+
+    // Wenn keine Daten gefunden wurden, erstelle einen neuen Eintrag
+    if (!data) {
+      const defaultCurrencies = {
+        inventory_id: inventoryId,
+        copper: 0,
+        silver: 0,
+        gold: 0,
+        platinum: 0
+      };
+
+      const { data: newData, error: insertError } = await supabase
+        .from('inventory_currencies')
+        .upsert(defaultCurrencies, {  // Verwende upsert statt insert
+          onConflict: 'inventory_id'
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error creating currencies:', insertError);
+        return [
+          { type: 'copper', amount: 0 },
+          { type: 'silver', amount: 0 },
+          { type: 'gold', amount: 0 },
+          { type: 'platinum', amount: 0 }
+        ];
+      }
+
+      return [
+        { type: 'copper', amount: newData.copper },
+        { type: 'silver', amount: newData.silver },
+        { type: 'gold', amount: newData.gold },
+        { type: 'platinum', amount: newData.platinum }
+      ];
+    }
+
+    return [
+      { type: 'copper', amount: data.copper },
+      { type: 'silver', amount: data.silver },
+      { type: 'gold', amount: data.gold },
+      { type: 'platinum', amount: data.platinum }
+    ];
+  } catch (error) {
+    console.error('Error in getInventoryCurrencies:', error);
+    // Bei einem Fehler geben wir Standardwerte zurück
+    return [
+      { type: 'copper', amount: 0 },
+      { type: 'silver', amount: 0 },
+      { type: 'gold', amount: 0 },
+      { type: 'platinum', amount: 0 }
+    ];
   }
 }
