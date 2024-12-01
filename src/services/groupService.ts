@@ -593,3 +593,51 @@ export async function getAvailableCategories(groupId: string): Promise<string[]>
     throw error;
   }
 }
+
+export async function getCustomItems(groupId: string): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('custom_items')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('name');
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function deleteCustomItem(groupId: string, itemId: string): Promise<void> {
+  const { error } = await supabase
+    .from('custom_items')
+    .delete()
+    .eq('id', itemId)
+    .eq('group_id', groupId);
+
+  if (error) throw error;
+}
+
+export async function updateCustomItem(groupId: string, item: {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  weight: number;
+}): Promise<void> {
+  const { error } = await supabase
+    .from('custom_items')
+    .upsert({  // Verwende upsert statt update
+      id: item.id,  // ID muss hier mit angegeben werden
+      group_id: groupId,  // group_id muss hier mit angegeben werden
+      name: item.name,
+      description: item.description,
+      category: item.category,
+      weight: item.weight
+    }, {
+      onConflict: 'id',  // Update nur wenn ID existiert
+      ignoreDuplicates: false
+    });
+
+  if (error) {
+    console.error('Update error:', error);
+    throw error;
+  }
+}

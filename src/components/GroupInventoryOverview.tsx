@@ -12,6 +12,7 @@ import { syncUser } from '../services/userService';
 import { ItemList } from './ItemList';
 import { AddItemModal } from './AddItemModal';
 import { CreateCustomItemModal } from './CreateCustomItemModal';
+import { ManageCustomItemsModal } from './ManageCustomItemsModal';
 
 // Neuer Import für das Chevron Icon
 import ChevronIcon from '/icons/chevron.svg';
@@ -29,6 +30,7 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showCreateItemModal, setShowCreateItemModal] = useState(false);
+  const [showManageItemsModal, setShowManageItemsModal] = useState(false);
 
   // Neuer state für collapsed inventories
   const [collapsedInventories, setCollapsedInventories] = useState<{ [key: string]: boolean }>({});
@@ -109,12 +111,20 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
           {isDM ? 'Group Inventories' : 'Your Inventory'}
         </h2>
         {isDM && (
-          <button
-            onClick={() => setShowCreateItemModal(true)}
-            className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-          >
-            Create Custom Item
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCreateItemModal(true)}
+              className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+            >
+              Create Custom Item
+            </button>
+            <button
+              onClick={() => setShowManageItemsModal(true)}
+              className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+            >
+              Manage Custom Items
+            </button>
+          </div>
         )}
       </div>
 
@@ -222,6 +232,18 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
           onItemCreated={() => {
             setShowCreateItemModal(false);
             // Optional: Aktualisieren Sie hier die Item-Liste
+          }}
+        />
+      )}
+
+      {showManageItemsModal && (
+        <ManageCustomItemsModal
+          groupId={groupId}
+          userId={user?.id || ''}
+          onClose={() => setShowManageItemsModal(false)}
+          onItemUpdated={() => {
+            setShowManageItemsModal(false);
+            loadInventories();
           }}
         />
       )}
