@@ -39,7 +39,7 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [quantityInputs, setQuantityInputs] = useState<{ [key: string]: string }>({});
   const [updating, setUpdating] = useState<string | null>(null);
-  const [itemsState, setItemsState] = useState<ItemWithShowInfo[]>([]);
+  const [itemsState, setItemsState] = useState<{ [key: string]: boolean }>({});
   const [animatingItemId, setAnimatingItemId] = useState<string | null>(null);
   const prevItemsRef = useRef<Item[]>([]);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
@@ -72,7 +72,12 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
   }, [sortField, sortDirection]);
 
   useEffect(() => {
-    setItemsState(items.map(item => ({ ...item, showInfo: false })));
+    setItemsState(
+      items.reduce((acc, item) => ({
+        ...acc,
+        [item.id]: false
+      }), {})
+    );
   }, [items]);
 
   useEffect(() => {
@@ -198,12 +203,11 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
     }
   }
 
-  const toggleItemInfo = (index: number) => {
-    setItemsState(prevItems => 
-      prevItems.map((item, i) => 
-        i === index ? { ...item, showInfo: !item.showInfo } : item
-      )
-    );
+  const toggleItemInfo = (itemId: string) => {
+    setItemsState(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
   };
 
   return (
@@ -263,8 +267,8 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
           {items.length === 0 ? 'No items in inventory' : 'No items match your search'}
         </p>
       ) : (
-        filteredAndSortedItems.map((item, index) => {
-          const itemStateData = itemsState.find(state => state.id === item.id) || { ...item, showInfo: false };
+        filteredAndSortedItems.map((item) => {
+          const showInfo = itemsState[item.id] || false;
           return (
             <div 
               key={item.id}
@@ -298,7 +302,7 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
                   <div className="flex items-center gap-2">
                     {item.items?.description && (
                       <button 
-                        onClick={() => toggleItemInfo(index)}
+                        onClick={() => toggleItemInfo(item.id)}
                         className="info-icon-button"
                       >
                         <img
@@ -318,7 +322,7 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
                     </span>
                   </div>
                 </div>
-                {itemStateData.showInfo && (
+                {showInfo && (
                   <p className="text-sm text-gray-300 mt-1">{item.items?.description}</p>
                 )}
                 <div className="flex gap-4 mt-1 text-xs text-gray-400">
