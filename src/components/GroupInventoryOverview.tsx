@@ -212,11 +212,11 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
         </div>
       )}
 
-      <div className="grid gap-6">
+      <div className="grid gap-6 backdrop-blur-sm bg-white/5 rounded-xl border border-white/10">
         {inventories.map((inventory) => (
           <div
             key={inventory.id}
-            className="bg-white/5 rounded-lg overflow-hidden"
+            className="rounded-lg overflow-hidden"
           >
             <div 
               className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-colors"
