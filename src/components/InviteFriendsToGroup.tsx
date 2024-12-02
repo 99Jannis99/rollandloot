@@ -6,7 +6,8 @@ import { inviteToGroup, getGroupMembers } from '../services/groupService';
 
 interface InviteFriendsToGroupProps {
   groupId: string;
-  onMemberAdded?: () => void;
+  onMemberAdded: () => void;
+  removedMemberId: string | null;
 }
 
 interface Friend {
@@ -15,7 +16,7 @@ interface Friend {
   avatar_url: string;
 }
 
-export function InviteFriendsToGroup({ groupId, onMemberAdded }: InviteFriendsToGroupProps) {
+export function InviteFriendsToGroup({ groupId, onMemberAdded, removedMemberId }: InviteFriendsToGroupProps) {
   const { user } = useUser();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,6 +24,8 @@ export function InviteFriendsToGroup({ groupId, onMemberAdded }: InviteFriendsTo
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
   const [animatingFriendId, setAnimatingFriendId] = useState<string | null>(null);
+  const [newMembers, setNewMembers] = useState<string[]>([]);
+  const [animatingMemberId, setAnimatingMemberId] = useState<string | null>(null);
 
   async function loadFriends() {
     if (!user) return;
@@ -68,6 +71,29 @@ export function InviteFriendsToGroup({ groupId, onMemberAdded }: InviteFriendsTo
   useEffect(() => {
     loadFriends();
   }, [user, groupId]);
+
+  // Effekt zum Tracken neuer verfügbarer Mitglieder
+  useEffect(() => {
+    const prevMembers = new Set(newMembers);
+    return () => {
+      // Wenn ein neues Mitglied verfügbar wird, Animation triggern
+      const addedMembers = newMembers.filter(id => !prevMembers.has(id));
+      if (addedMembers.length > 0) {
+        setAnimatingMemberId(addedMembers[0]);
+        setTimeout(() => setAnimatingMemberId(null), 500);
+      }
+    };
+  }, [newMembers]);
+
+  // Reagiere auf entfernte Mitglieder
+  useEffect(() => {
+    if (removedMemberId) {
+      loadFriends();
+      // Trigger Animation für das neue Element
+      setAnimatingMemberId(removedMemberId);
+      setTimeout(() => setAnimatingMemberId(null), 500);
+    }
+  }, [removedMemberId]);
 
   // Hilfsfunktion zum Kürzen von Benutzernamen
   const truncateUsername = (username: string, maxLength: number = 15) => {
@@ -137,7 +163,7 @@ export function InviteFriendsToGroup({ groupId, onMemberAdded }: InviteFriendsTo
             <div
               key={friend.id}
               className={`flex items-center justify-between p-3 bg-white/5 rounded-lg transition-all duration-500 ${
-                animatingFriendId === friend.id ? 'animate-slide-out' : ''
+                animatingMemberId === friend.id ? 'animate-[slideIn_0.5s_ease-out]' : ''
               }`}
             >
               <div className="flex items-center space-x-3">

@@ -802,3 +802,26 @@ export function subscribeToInventoryChanges(
     supabase.removeChannel(channel);
   };
 }
+
+export async function removeGroupMember(groupId: string, userId: string): Promise<void> {
+  try {
+    // Lösche zuerst das Inventar des Mitglieds
+    const { error: inventoryError } = await supabase
+      .from('group_inventories')
+      .delete()
+      .match({ group_id: groupId, user_id: userId });
+
+    if (inventoryError) throw inventoryError;
+
+    // Dann entferne das Mitglied aus der Gruppe
+    const { error: memberError } = await supabase
+      .from('group_members')
+      .delete()
+      .match({ group_id: groupId, user_id: userId });
+
+    if (memberError) throw memberError;
+  } catch (error) {
+    console.error('Error removing group member:', error);
+    throw error;
+  }
+}

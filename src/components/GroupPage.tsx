@@ -1,11 +1,12 @@
-import { useParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
-import { supabase } from '../lib/supabase';
-import { GroupMembers } from './GroupMembers';
-import { GroupInventoryOverview } from './GroupInventoryOverview';
-import { InviteFriendsToGroup } from './InviteFriendsToGroup';
-import { syncUser } from '../services/userService';
+import { supabase } from "../lib/supabase";
+import { GroupMembers } from "./GroupMembers";
+import { GroupInventoryOverview } from "./GroupInventoryOverview";
+import { InviteFriendsToGroup } from "./InviteFriendsToGroup";
+import { syncUser } from "../services/userService";
+import { EditGroupMembersModal } from "./EditGroupMembersModal";
 
 interface Group {
   id: string;
@@ -17,7 +18,7 @@ interface Group {
 interface Member {
   id: string;
   user_id: string;
-  role: 'admin' | 'member' | 'dm';
+  role: "admin" | "member" | "dm";
   users: {
     username: string;
     avatar_url: string;
@@ -29,9 +30,11 @@ export function GroupPage() {
   const { user } = useUser();
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [userRole, setUserRole] = useState<string>('');
+  const [userRole, setUserRole] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [shouldRefreshInventories, setShouldRefreshInventories] = useState(0);
+  const [showEditMembersModal, setShowEditMembersModal] = useState(false);
+  const [removedMemberId, setRemovedMemberId] = useState<string | null>(null);
 
   async function fetchGroupData() {
     try {
@@ -42,9 +45,9 @@ export function GroupPage() {
 
       // Fetch group details
       const { data: groupData, error: groupError } = await supabase
-        .from('groups')
-        .select('*')
-        .eq('id', id)
+        .from("groups")
+        .select("*")
+        .eq("id", id)
         .single();
 
       if (groupError) throw groupError;
@@ -52,8 +55,9 @@ export function GroupPage() {
 
       // Fetch group members with their user details
       const { data: membersData, error: membersError } = await supabase
-        .from('group_members')
-        .select(`
+        .from("group_members")
+        .select(
+          `
           id,
           user_id,
           role,
@@ -61,21 +65,22 @@ export function GroupPage() {
             username,
             avatar_url
           )
-        `)
-        .eq('group_id', id);
+        `
+        )
+        .eq("group_id", id);
 
       if (membersError) throw membersError;
       setMembers(membersData);
 
       // Find current user's role
       const currentMember = membersData.find(
-        member => member.user_id === supabaseUser.id
+        (member) => member.user_id === supabaseUser.id
       );
       if (currentMember) {
         setUserRole(currentMember.role);
       }
     } catch (error) {
-      console.error('Error fetching group data:', error);
+      console.error("Error fetching group data:", error);
     } finally {
       setLoading(false);
     }
@@ -87,7 +92,7 @@ export function GroupPage() {
 
   const handleMemberAdded = async () => {
     await fetchGroupData();
-    setShouldRefreshInventories(prev => prev + 1);
+    setShouldRefreshInventories((prev) => prev + 1);
   };
 
   if (loading) {
@@ -102,7 +107,9 @@ export function GroupPage() {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-red-400">Group not found</h2>
-        <p className="text-gray-300 mt-2">This group might have been deleted or you don't have access to it.</p>
+        <p className="text-gray-300 mt-2">
+          This group might have been deleted or you don't have access to it.
+        </p>
       </div>
     );
   }
@@ -120,27 +127,50 @@ export function GroupPage() {
 
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
-          <GroupInventoryOverview 
-            groupId={group.id} 
+          <GroupInventoryOverview
+            groupId={group.id}
             key={shouldRefreshInventories}
           />
         </div>
         <div className="space-y-8">
-          <h2 className="text-2xl font-bold">Group Members</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4 w-full justify-between">
+              <h2 className="text-2xl font-bold">Group Members</h2>
+              {(userRole === "admin" || userRole === "dm") && (
+                <button
+                  onClick={() => setShowEditMembersModal(true)}
+                  className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+          </div>
           <div className="space-y-8">
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-              <GroupMembers 
+              <GroupMembers
                 members={members}
                 groupId={group.id}
                 userRole={userRole}
                 onMembersUpdate={setMembers}
               />
             </div>
-            {(userRole === 'admin' || userRole === 'dm') && (
+            {showEditMembersModal && (
+              <EditGroupMembersModal
+                groupId={group.id}
+                onClose={() => setShowEditMembersModal(false)}
+                onMembersUpdated={(removedId) => {
+                  fetchGroupData();
+                  setRemovedMemberId(removedId);
+                }}
+              />
+            )}
+            {(userRole === "admin" || userRole === "dm") && (
               <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-                <InviteFriendsToGroup 
-                  groupId={group.id} 
+                <InviteFriendsToGroup
+                  groupId={group.id}
                   onMemberAdded={handleMemberAdded}
+                  removedMemberId={removedMemberId}
                 />
               </div>
             )}
