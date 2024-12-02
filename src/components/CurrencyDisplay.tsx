@@ -64,7 +64,7 @@ export function CurrencyDisplay({ currencies, isDM, onUpdate }: CurrencyDisplayP
             <img 
               src={currencyIcons[currency.type]} 
               alt={currency.type}
-              className="w-6 h-6"
+              className="w-8 h-8"
             />
             <span className="text-sm text-gray-400 w-24">{currencySymbols[currency.type]}</span>
             <span className="w-16 text-right">{currency.amount}</span>
