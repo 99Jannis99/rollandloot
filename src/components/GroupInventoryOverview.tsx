@@ -96,16 +96,13 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
           table: 'inventory_items'
         },
         (payload) => {
-          // Synchrone Operation
           if (isSubscribed) {
-            // Verwende requestAnimationFrame für das Update
             requestAnimationFrame(() => {
               if (isSubscribed) {
                 reloadInventoryData();
               }
             });
           }
-          return false; // Wichtig: Immer false zurückgeben
         }
       )
       // Listener für inventory_currencies
@@ -117,16 +114,32 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
           table: 'inventory_currencies'
         },
         (payload) => {
-          // Synchrone Operation
           if (isSubscribed && payload.new?.inventory_id) {
-            // Verwende requestAnimationFrame für das Update
             requestAnimationFrame(() => {
               if (isSubscribed) {
                 loadCurrencies(payload.new!.inventory_id);
               }
             });
           }
-          return false; // Wichtig: Immer false zurückgeben
+        }
+      )
+      // Listener für group_members Änderungen
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'group_members',
+          filter: `group_id=eq.${groupId}`
+        },
+        (payload) => {
+          if (isSubscribed) {
+            requestAnimationFrame(() => {
+              if (isSubscribed) {
+                reloadInventoryData();
+              }
+            });
+          }
         }
       )
       .subscribe();
@@ -143,7 +156,6 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
       }
     };
 
-    // Starte initiales Laden
     requestAnimationFrame(() => {
       if (isSubscribed) {
         initializeData();
@@ -234,9 +246,7 @@ export function GroupInventoryOverview({ groupId }: GroupInventoryOverviewProps)
                       className="text-lg font-semibold"
                       title={`${inventory.user?.username}'s Inventory`}
                     >
-                      {inventory.user?.username 
-                        ? `${truncateUsername(inventory.user.username)}'s Inventory`
-                        : 'Unknown User\'s Inventory'}
+                      {inventory.member?.nickname || inventory.user?.username || 'Unknown User'}'s Inventory
                     </h3>
                   </>
                 )}

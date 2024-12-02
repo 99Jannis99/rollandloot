@@ -28,6 +28,9 @@ export interface GroupInventory {
     username: string;
     avatar_url: string;
   };
+  member?: {
+    nickname: string | null;
+  };
   inventory_items: {
     id: string;
     item_id: string;
@@ -65,6 +68,7 @@ export async function getAllGroupInventories(groupId: string): Promise<GroupInve
       .select(`
         user_id,
         role,
+        nickname,
         users (
           username,
           avatar_url
@@ -110,6 +114,9 @@ export async function getAllGroupInventories(groupId: string): Promise<GroupInve
         user_id: member.user_id,
         group_id: groupId,
         user: member.users,
+        member: {
+          nickname: member.nickname
+        },
         inventory_items: inventoryItems || []
       };
     }));
@@ -822,6 +829,26 @@ export async function removeGroupMember(groupId: string, userId: string): Promis
     if (memberError) throw memberError;
   } catch (error) {
     console.error('Error removing group member:', error);
+    throw error;
+  }
+}
+
+export async function updateMemberNickname(
+  groupId: string, 
+  userId: string, 
+  nickname: string
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .rpc('update_member_nickname', {
+        p_group_id: groupId,
+        p_user_id: userId,
+        p_nickname: nickname
+      });
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating nickname:', error);
     throw error;
   }
 }

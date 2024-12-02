@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { getGroupMembers, removeGroupMember } from '../services/groupService';
+import { XMarkIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { getGroupMembers, removeGroupMember, updateMemberNickname } from '../services/groupService';
 
 interface Member {
   id: string;
   user_id: string;
   role: string;
+  nickname: string | null;
   users: {
     username: string;
     avatar_url: string;
@@ -22,6 +23,8 @@ export function EditGroupMembersModal({ groupId, onClose, onMembersUpdated }: Ed
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingNickname, setEditingNickname] = useState<string | null>(null);
+  const [newNickname, setNewNickname] = useState<string>('');
 
   useEffect(() => {
     loadMembers();
@@ -45,6 +48,23 @@ export function EditGroupMembersModal({ groupId, onClose, onMembersUpdated }: Ed
       onMembersUpdated(userId);
     } catch (err) {
       setError('Failed to remove member');
+    }
+  };
+
+  const handleUpdateNickname = async (member: Member) => {
+    try {
+      setMembers(prev => prev.map(m => {
+        if (m.id === member.id) {
+          return { ...m, nickname: newNickname };
+        }
+        return m;
+      }));
+      
+      await updateMemberNickname(groupId, member.user_id, newNickname);
+      setEditingNickname(null);
+    } catch (err) {
+      await loadMembers();
+      setError('Failed to update nickname');
     }
   };
 
@@ -81,14 +101,60 @@ export function EditGroupMembersModal({ groupId, onClose, onMembersUpdated }: Ed
                     alt={member.users.username}
                     className="w-10 h-10 rounded-full"
                   />
-                  <span>{member.users.username}</span>
+                  <div className="flex flex-col">
+                    {editingNickname === member.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newNickname}
+                          onChange={(e) => setNewNickname(e.target.value)}
+                          className="px-2 py-1 bg-black/30 border border-white/10 rounded text-sm"
+                          placeholder={member.users.username}
+                        />
+                        <button
+                          onClick={() => handleUpdateNickname(member)}
+                          className="px-3 py-1 text-sm bg-green-600/10 text-green-400 hover:bg-green-600/20 rounded-lg transition-colors"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingNickname(null)}
+                          className="px-3 py-1 text-sm bg-red-600/10 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span>{member.nickname || member.users.username}</span>
+                        {member.nickname && (
+                          <span className="text-xs text-gray-400">
+                            @{member.users.username}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleRemoveMember(member.user_id)}
-                  className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                >
-                  <TrashIcon className="w-5 h-5" />
-                </button>
+                {editingNickname !== member.id && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingNickname(member.id);
+                        setNewNickname(member.nickname || '');
+                      }}
+                      className="p-2 text-violet-400 hover:bg-violet-400/10 rounded-lg transition-colors"
+                    >
+                      <PencilIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleRemoveMember(member.user_id)}
+                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
