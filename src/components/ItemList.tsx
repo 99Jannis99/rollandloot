@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { removeItemFromInventory, updateItemQuantity } from '../services/groupService';
-import { PlusIcon, MinusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, MinusIcon, TrashIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import InfoIcon from '/icons/info.svg';
 
 interface Item {
@@ -30,6 +30,11 @@ interface ItemListProps {
   onItemUpdated: () => void;
 }
 
+type SortField = 'name' | 'category' | 'weight' | 'quantity';
+type SortDirection = 'asc' | 'desc';
+
+const SORT_STORAGE_KEY = 'inventory-sort-preferences';
+
 export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: ItemListProps) {
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [quantityInputs, setQuantityInputs] = useState<{ [key: string]: string }>({});
@@ -38,6 +43,32 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
   const [animatingItemId, setAnimatingItemId] = useState<string | null>(null);
   const prevItemsRef = useRef<Item[]>([]);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>(() => {
+    const saved = localStorage.getItem(SORT_STORAGE_KEY);
+    if (saved) {
+      const { field } = JSON.parse(saved);
+      return field as SortField;
+    }
+    return 'name';
+  });
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    const saved = localStorage.getItem(SORT_STORAGE_KEY);
+    if (saved) {
+      const { direction } = JSON.parse(saved);
+      return direction as SortDirection;
+    }
+    return 'asc';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      SORT_STORAGE_KEY, 
+      JSON.stringify({ 
+        field: sortField, 
+        direction: sortDirection 
+      })
+    );
+  }, [sortField, sortDirection]);
 
   useEffect(() => {
     setItemsState(items.map(item => ({ ...item, showInfo: false })));
@@ -65,6 +96,48 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
 
     prevItemsRef.current = items;
   }, [items]);
+
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      let compareA, compareB;
+      
+      switch (sortField) {
+        case 'name':
+          compareA = a.items.name.toLowerCase();
+          compareB = b.items.name.toLowerCase();
+          break;
+        case 'category':
+          compareA = a.items.category.toLowerCase();
+          compareB = b.items.category.toLowerCase();
+          break;
+        case 'weight':
+          compareA = a.items.weight;
+          compareB = b.items.weight;
+          break;
+        case 'quantity':
+          compareA = a.quantity;
+          compareB = b.quantity;
+          break;
+        default:
+          return 0;
+      }
+
+      if (sortDirection === 'asc') {
+        return compareA < compareB ? -1 : compareA > compareB ? 1 : 0;
+      } else {
+        return compareA > compareB ? -1 : compareA < compareB ? 1 : 0;
+      }
+    });
+  }, [items, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
   async function handleRemoveItem(itemId: string) {
     try {
@@ -128,10 +201,49 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
 
   return (
     <div className="space-y-3">
-      {items.length === 0 ? (
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => handleSort('name')}
+          className={`flex items-center gap-1 px-3 py-1 rounded ${
+            sortField === 'name' ? 'bg-violet-600/20 text-violet-400' : 'bg-black/20 text-gray-400'
+          }`}
+        >
+          Name
+          <ChevronUpDownIcon className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleSort('category')}
+          className={`flex items-center gap-1 px-3 py-1 rounded ${
+            sortField === 'category' ? 'bg-violet-600/20 text-violet-400' : 'bg-black/20 text-gray-400'
+          }`}
+        >
+          Category
+          <ChevronUpDownIcon className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleSort('weight')}
+          className={`flex items-center gap-1 px-3 py-1 rounded ${
+            sortField === 'weight' ? 'bg-violet-600/20 text-violet-400' : 'bg-black/20 text-gray-400'
+          }`}
+        >
+          Weight
+          <ChevronUpDownIcon className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleSort('quantity')}
+          className={`flex items-center gap-1 px-3 py-1 rounded ${
+            sortField === 'quantity' ? 'bg-violet-600/20 text-violet-400' : 'bg-black/20 text-gray-400'
+          }`}
+        >
+          Quantity
+          <ChevronUpDownIcon className="w-4 h-4" />
+        </button>
+      </div>
+
+      {sortedItems.length === 0 ? (
         <p className="text-gray-400 text-center py-4">No items in inventory</p>
       ) : (
-        items.map((item, index) => {
+        sortedItems.map((item, index) => {
           const itemStateData = itemsState.find(state => state.id === item.id) || { ...item, showInfo: false };
           return (
             <div 
