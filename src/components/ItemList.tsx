@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { removeItemFromInventory, updateItemQuantity } from '../services/groupService';
-import { PlusIcon, MinusIcon, TrashIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, MinusIcon, TrashIcon, ChevronUpDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import InfoIcon from '/icons/info.svg';
 
 interface Item {
@@ -59,6 +59,7 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
     }
     return 'asc';
   });
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     localStorage.setItem(
@@ -97,8 +98,14 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
     prevItemsRef.current = items;
   }, [items]);
 
-  const sortedItems = useMemo(() => {
-    return [...items].sort((a, b) => {
+  const filteredAndSortedItems = useMemo(() => {
+    const filtered = items.filter(item => 
+      item.items.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.items.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.items.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return filtered.sort((a, b) => {
       let compareA, compareB;
       
       switch (sortField) {
@@ -128,7 +135,7 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
         return compareA > compareB ? -1 : compareA < compareB ? 1 : 0;
       }
     });
-  }, [items, sortField, sortDirection]);
+  }, [items, searchTerm, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -201,6 +208,17 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
 
   return (
     <div className="space-y-3">
+      <div className="relative">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search items..."
+          className="w-full px-4 py-2 pl-10 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-gray-200"
+        />
+        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+      </div>
+
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => handleSort('name')}
@@ -240,10 +258,12 @@ export function ItemList({ items, isDM, userId, onItemRemoved, onItemUpdated }: 
         </button>
       </div>
 
-      {sortedItems.length === 0 ? (
-        <p className="text-gray-400 text-center py-4">No items in inventory</p>
+      {filteredAndSortedItems.length === 0 ? (
+        <p className="text-gray-400 text-center py-4">
+          {items.length === 0 ? 'No items in inventory' : 'No items match your search'}
+        </p>
       ) : (
-        sortedItems.map((item, index) => {
+        filteredAndSortedItems.map((item, index) => {
           const itemStateData = itemsState.find(state => state.id === item.id) || { ...item, showInfo: false };
           return (
             <div 
