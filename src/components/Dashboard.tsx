@@ -25,25 +25,23 @@ interface Group extends GroupData {
 export function Dashboard() {
   const { user } = useUser();
   const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
+    if (!user) return;
 
+    let isSubscribed = true;
+
+    // Initiale Ladung der Gruppen
     async function fetchGroups() {
       try {
         if (!user) return;
         setError(null);
-        setLoading(true);
 
-        const supabaseUser = await syncUser(user).catch(error => {
-          console.error('User sync failed:', error);
-          throw new Error('Failed to sync user data. Please try again.');
-        });
-
+        const supabaseUser = await syncUser(user);
         const { data, error } = await supabase
           .from('group_members')
           .select(`
@@ -58,7 +56,7 @@ export function Dashboard() {
 
         if (error) throw error;
 
-        if (isMounted && data) {
+        if (isSubscribed && data) {
           const validGroups = data
             .filter(item => item.groups !== null)
             .map(item => ({
@@ -71,27 +69,57 @@ export function Dashboard() {
           setGroups(validGroups);
         }
       } catch (error: any) {
-        console.error('Error fetching groups:', error);
-        if (isMounted) {
+        if (isSubscribed) {
           setError(error.message || 'Failed to load groups. Please try again later.');
         }
       } finally {
-        if (isMounted) {
-          setLoading(false);
+        if (isSubscribed) {
+          setInitialLoading(false);
         }
       }
     }
 
+    const channel = supabase.channel('dashboard-changes')
+      // Höre auf Gruppenänderungen
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'groups'
+        },
+        (payload) => {
+          if (!isSubscribed) return;
+          fetchGroups();
+        }
+      )
+      // Höre auf Mitgliedschaftsänderungen
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'group_members'
+        },
+        (payload) => {
+          if (!isSubscribed) return;
+          fetchGroups();
+        }
+      )
+      .subscribe();
+
+    // Initiales Laden
     fetchGroups();
 
     return () => {
-      isMounted = false;
+      isSubscribed = false;
+      channel.unsubscribe();
     };
   }, [user]);
 
   const handleGroupCreated = (newGroup: Group) => {
     setGroups([...groups, newGroup]);
-    setShowCreateModal(false);
+    setEditingGroup(null);
   };
 
   const handleGroupUpdated = (updatedGroup: Group) => {
@@ -108,7 +136,7 @@ export function Dashboard() {
     setEditingGroup(null);
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="text-lg text-gray-300">Loading your groups...</div>
@@ -180,7 +208,10 @@ export function Dashboard() {
       {showCreateModal && (
         <CreateGroupModal
           onClose={() => setShowCreateModal(false)}
-          onGroupCreated={handleGroupCreated}
+          onGroupCreated={(newGroup) => {
+            setGroups([...groups, newGroup]);
+            setShowCreateModal(false);
+          }}
         />
       )}
 
