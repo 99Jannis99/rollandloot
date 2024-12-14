@@ -2,7 +2,6 @@ import { supabase } from "../lib/supabase";
 
 export interface SupabaseUser {
   id: string;
-  email: string;
   username: string;
   avatar_url: string;
   last_online: string;
@@ -15,9 +14,6 @@ export async function syncUser(clerkUser: any): Promise<SupabaseUser> {
   console.log("Clerk User:", clerkUser);
 
   try {
-    const email = clerkUser.primaryEmailAddress?.emailAddress;
-    if (!email) throw new Error("User email not found");
-
     // Prüfen, ob der Benutzer in der Supabase-Datenbank existiert
     const { data: existingUser, error } = await supabase
       .from("users")
@@ -33,7 +29,6 @@ export async function syncUser(clerkUser: any): Promise<SupabaseUser> {
     const userData: SupabaseUser = {
       id: existingUser?.id || "",
       clerk_id: clerkUser.id,
-      email,
       username: clerkUser.username,
       avatar_url: clerkUser.imageUrl,
       last_online: new Date().toISOString(),
@@ -44,7 +39,12 @@ export async function syncUser(clerkUser: any): Promise<SupabaseUser> {
       console.log("User not found, creating new user in Supabase...");
       const { data: newUser, error: insertError } = await supabase
         .from("users")
-        .insert([userData])
+        .insert([{
+          clerk_id: userData.clerk_id,
+          username: userData.username,
+          avatar_url: userData.avatar_url,
+          last_online: userData.last_online
+        }])
         .select()
         .single();
 
