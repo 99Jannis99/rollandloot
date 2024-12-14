@@ -1,18 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = 'https://digpdyxoyxbmzypretli.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpZ3BkeXhveXhibXp5cHJldGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzIxOTIyMTQsImV4cCI6MjA0Nzc2ODIxNH0.Jw-QZyz52jjmY9FzbaXhU9Kq3OnEg5W4yfcfbbyN5O4';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  db: {
-    schema: 'public'
-  },
-  auth: {
-    persistSession: false
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
-    }
-  }
-});
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("Env vars:", {
+    url: import.meta.env.VITE_SUPABASE_URL,
+    key: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  });
+  throw new Error("Supabase URL und Anon Key müssen in .env definiert sein");
+}
+
+// Supabase-Client ohne Authentifizierung
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);

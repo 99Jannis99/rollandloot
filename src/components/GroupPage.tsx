@@ -7,6 +7,7 @@ import { GroupInventoryOverview } from "./GroupInventoryOverview";
 import { InviteFriendsToGroup } from "./InviteFriendsToGroup";
 import { syncUser } from "../services/userService";
 import { EditGroupMembersModal } from "./EditGroupMembersModal";
+import { GroupNotes } from './GroupNotes';
 
 interface Group {
   id: string;
@@ -175,6 +176,10 @@ export function GroupPage() {
               </div>
             )}
           </div>
+          
+          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+              <GroupNotes groupId={group.id} />
+            </div>
         </div>
       </div>
     </div>

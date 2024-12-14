@@ -1,5 +1,4 @@
-import { supabase } from '../lib/supabase';
-import type { User } from '@clerk/clerk-react';
+import { supabase } from "../lib/supabase";
 
 export interface SupabaseUser {
   id: string;
@@ -8,72 +7,60 @@ export interface SupabaseUser {
   avatar_url: string;
   last_online: string;
   clerk_id: string;
+  token?: string;
 }
 
-export async function syncUser(clerkUser: User): Promise<SupabaseUser> {
+export async function syncUser(clerkUser: any): Promise<SupabaseUser> {
+  console.log("Starting syncUser...");
+  console.log("Clerk User:", clerkUser);
+
   try {
     const email = clerkUser.primaryEmailAddress?.emailAddress;
-    if (!email) throw new Error('User email not found');
-    if (!clerkUser.username) throw new Error('Username is required');
+    if (!email) throw new Error("User email not found");
 
-    // Suche nach existierendem Benutzer
-    const { data: existingUser, error: searchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('clerk_id', clerkUser.id)
+    // Prüfen, ob der Benutzer in der Supabase-Datenbank existiert
+    const { data: existingUser, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("clerk_id", clerkUser.id)
       .maybeSingle();
 
-    if (searchError) {
-      console.error('Search error:', searchError);
-      throw searchError;
+    if (error) {
+      console.error("Error fetching user from Supabase:", error);
+      throw error;
     }
 
-    const userData = {
+    const userData: SupabaseUser = {
+      id: existingUser?.id || "",
+      clerk_id: clerkUser.id,
       email,
       username: clerkUser.username,
       avatar_url: clerkUser.imageUrl,
       last_online: new Date().toISOString(),
-      clerk_id: clerkUser.id
     };
 
+    // Benutzer erstellen oder aktualisieren
     if (!existingUser) {
-      // Erstelle neuen Benutzer
-      const { data, error: insertError } = await supabase
-        .from('users')
+      console.log("User not found, creating new user in Supabase...");
+      const { data: newUser, error: insertError } = await supabase
+        .from("users")
         .insert([userData])
         .select()
         .single();
 
       if (insertError) {
-        console.error('Insert error:', insertError);
+        console.error("Error creating user in Supabase:", insertError);
         throw insertError;
       }
 
-      return data;
+      console.log("User created successfully.");
+      return newUser;
     }
 
-    // Update existierenden Benutzer via RPC
-    const { data: updatedUser, error: updateError } = await supabase
-      .rpc('update_user', {
-        p_clerk_id: clerkUser.id,
-        p_email: email,
-        p_username: clerkUser.username,
-        p_avatar_url: clerkUser.imageUrl,
-        p_last_online: new Date().toISOString()
-      }).single();
-
-    if (updateError) {
-      console.error('Update error:', updateError);
-      throw updateError;
-    }
-
-    if (!updatedUser) {
-      throw new Error('Update failed: No user returned');
-    }
-
-    return updatedUser;
-  } catch (error: any) {
-    console.error('Error syncing user:', error);
-    throw new Error(`Failed to sync user: ${error.message || 'Unknown error'}`);
+    console.log("User exists, returning existing user.");
+    return existingUser;
+  } catch (error) {
+    console.error("Error in syncUser:", error);
+    throw error;
   }
 }
