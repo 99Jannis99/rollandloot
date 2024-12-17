@@ -10,8 +10,8 @@ export interface SupabaseUser {
 }
 
 export async function syncUser(clerkUser: any): Promise<SupabaseUser> {
-  console.log("Starting syncUser...");
-  console.log("Clerk User:", clerkUser);
+  // console.log("Starting syncUser...");
+  // console.log("Clerk User:", clerkUser);
 
   try {
     // Prüfen, ob der Benutzer in der Supabase-Datenbank existiert
@@ -36,7 +36,7 @@ export async function syncUser(clerkUser: any): Promise<SupabaseUser> {
 
     // Benutzer erstellen oder aktualisieren
     if (!existingUser) {
-      console.log("User not found, creating new user in Supabase...");
+      // console.log("User not found, creating new user in Supabase...");
       const { data: newUser, error: insertError } = await supabase
         .from("users")
         .insert([{
@@ -53,11 +53,11 @@ export async function syncUser(clerkUser: any): Promise<SupabaseUser> {
         throw insertError;
       }
 
-      console.log("User created successfully.");
+      // console.log("User created successfully.");
       return newUser;
     }
 
-    console.log("User exists, returning existing user.");
+    // console.log("User exists, returning existing user.");
     return existingUser;
   } catch (error) {
     console.error("Error in syncUser:", error);

@@ -1,4 +1,4 @@
-import { supabase, ensureAuthenticated } from "../lib/supabase";
+import { supabase } from "../lib/supabase";
 import { syncUser } from "../services/userService";
 
 export interface Group {
@@ -1010,6 +1010,44 @@ export async function deleteGroupNote(
     console.log("Note deleted successfully:", noteId);
   } catch (error) {
     console.error("Error in deleteGroupNote:", error);
+    throw error;
+  }
+}
+
+export async function getUserInventoryItems(groupId: string, userId: string) {
+  try {
+    // Zuerst das Inventar des Users finden
+    const { data: inventory, error: inventoryError } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .single();
+
+    if (inventoryError) throw inventoryError;
+    if (!inventory) throw new Error('Inventory not found');
+
+    // Dann die Items des Inventars abrufen
+    const { data: items, error: itemsError } = await supabase
+      .from('inventory_items')
+      .select(`
+        id,
+        quantity,
+        items:all_items!inner(
+          id,
+          name,
+          description,
+          category,
+          weight
+        )
+      `)
+      .eq('inventory_id', inventory.id);
+
+    if (itemsError) throw itemsError;
+    return items || [];
+
+  } catch (error) {
+    console.error('Error fetching inventory items:', error);
     throw error;
   }
 }

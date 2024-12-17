@@ -8,6 +8,7 @@ import { InviteFriendsToGroup } from "./InviteFriendsToGroup";
 import { syncUser } from "../services/userService";
 import { EditGroupMembersModal } from "./EditGroupMembersModal";
 import { GroupNotes } from './GroupNotes';
+import { TradeNotifications } from './TradeNotifications';
 
 interface Group {
   id: string;
@@ -182,6 +183,8 @@ export function GroupPage() {
             </div>
         </div>
       </div>
+      
+      <TradeNotifications groupId={group.id} />
     </div>
   );
 }
