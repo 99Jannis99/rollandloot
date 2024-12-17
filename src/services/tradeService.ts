@@ -65,7 +65,6 @@ export async function createTradeOffer(
     status: 'pending'
   };
 
-  console.log('Creating trade with data:', tradeData);
 
   const { data, error } = await supabase
     .from('trades')
@@ -79,8 +78,6 @@ export async function createTradeOffer(
     console.error('Error hint:', error.hint);
     throw error;
   }
-
-  console.log('Trade created successfully:', data);
   return data;
 }
 
@@ -163,14 +160,14 @@ async function executeTradeTransfer(trade: Trade) {
     .eq('user_id', trade.receiver_id)
     .single();
 
-  // Starte eine Transaktion
-  const { error } = await supabase.rpc('execute_trade', {
+  // Nur den Trade ausführen
+  const { error: tradeError } = await supabase.rpc('execute_trade', {
     p_trade_id: trade.id,
     p_initiator_inventory_id: initiatorInventory.id,
     p_receiver_inventory_id: receiverInventory.id
   });
 
-  if (error) throw error;
+  if (tradeError) throw tradeError;
 }
 
 // Aktualisiere die acceptTrade Funktion
@@ -186,7 +183,7 @@ export async function acceptTrade(tradeId: string): Promise<void> {
   }
 
   try {
-    // Zuerst den Trade als akzeptiert markieren
+    // 1. Zuerst den Trade als akzeptiert markieren
     const { error: updateError } = await supabase
       .from('trades')
       .upsert({
@@ -196,19 +193,39 @@ export async function acceptTrade(tradeId: string): Promise<void> {
 
     if (updateError) throw updateError;
 
-    // Dann den Transfer ausführen
+    // 2. Den Transfer ausführen
     await executeTradeTransfer(existingTrade);
 
-    // Nach erfolgreichem Transfer den Trade löschen
-    const { error: deleteError } = await supabase
+    // 3. Den Trade löschen
+    const { error: deleteTradeError } = await supabase
       .from('trades')
       .delete()
       .eq('id', tradeId);
 
-    if (deleteError) {
-      console.error('Fehler beim Löschen des Trades:', deleteError);
-      throw deleteError;
-    }
+    if (deleteTradeError) throw deleteTradeError;
+
+    // 4. Erst jetzt die Items mit Quantity 0 löschen
+    const { data: initiatorInventory } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('group_id', existingTrade.group_id)
+      .eq('user_id', existingTrade.initiator_id)
+      .single();
+
+    const { data: receiverInventory } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('group_id', existingTrade.group_id)
+      .eq('user_id', existingTrade.receiver_id)
+      .single();
+
+    const { error: cleanupError } = await supabase
+      .from('inventory_items')
+      .delete()
+      .in('inventory_id', [initiatorInventory.id, receiverInventory.id])
+      .eq('quantity', 0);
+
+    if (cleanupError) throw cleanupError;
 
   } catch (error) {
     console.error('Error in acceptTrade:', error);
@@ -267,10 +284,7 @@ export async function cancelTrade(tradeId: string): Promise<void> {
       .delete()
       .eq('id', tradeId);
 
-    if (error) {
-      console.error('Error in cancelTrade:', error);
-      throw error;
-    }
+    if (error) throw error;
   } catch (error) {
     console.error('Error in cancelTrade:', error);
     throw error;
