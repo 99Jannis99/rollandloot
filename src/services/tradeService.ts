@@ -55,30 +55,99 @@ export async function createTradeOffer(
   offeredItem?: { id: string; quantity: number },
   offeredCoins?: { copper: number; silver: number; gold: number; platinum: number }
 ): Promise<Trade> {
-  const tradeData = {
-    group_id: groupId,
-    initiator_id: initiatorId,
-    receiver_id: receiverId,
-    offered_item_id: offeredItem?.id || null,
-    offered_item_quantity: offeredItem?.quantity || null,
-    offered_coins: offeredCoins || null,
-    status: 'pending'
-  };
+  try {
+    // 1. Hole das Inventar des Initiators
+    const { data: initiatorInventory, error: inventoryError } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('user_id', initiatorId)
+      .single();
 
+    if (inventoryError) throw inventoryError;
 
-  const { data, error } = await supabase
-    .from('trades')
-    .insert([tradeData])
-    .select()
-    .single();
+    // 2. Wenn ein Item angeboten wird, ziehe die Menge ab
+    if (offeredItem) {
+      // Hole zuerst die aktuelle Menge und item_type
+      const { data: currentItem, error: fetchError } = await supabase
+        .from('inventory_items')
+        .select('quantity, item_id, item_type, inventory_id')
+        .eq('id', offeredItem.id)
+        .single();
 
-  if (error) {
-    console.error('Supabase error:', error);
-    console.error('Error details:', error.details);
-    console.error('Error hint:', error.hint);
+      if (fetchError) throw fetchError;
+
+      // Berechne die neue Menge
+      const newQuantity = currentItem.quantity - offeredItem.quantity;
+
+      // Aktualisiere die Menge mit upsert
+      const { error: itemError } = await supabase
+        .from('inventory_items')
+        .upsert({
+          id: offeredItem.id,
+          inventory_id: currentItem.inventory_id,
+          item_id: currentItem.item_id,
+          item_type: currentItem.item_type,
+          quantity: newQuantity
+        });
+
+      if (itemError) throw itemError;
+    }
+
+    // 3. Wenn Coins angeboten werden, ziehe die Beträge ab
+    if (offeredCoins) {
+      // Hole zuerst die aktuellen Coins
+      const { data: currentCoins, error: fetchError } = await supabase
+        .from('inventory_currencies')
+        .select('copper, silver, gold, platinum')
+        .eq('inventory_id', initiatorInventory.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Berechne die neuen Werte
+      const newCoins = {
+        inventory_id: initiatorInventory.id,
+        copper: currentCoins.copper - (offeredCoins.copper || 0),
+        silver: currentCoins.silver - (offeredCoins.silver || 0),
+        gold: currentCoins.gold - (offeredCoins.gold || 0),
+        platinum: currentCoins.platinum - (offeredCoins.platinum || 0)
+      };
+
+      // Aktualisiere die Coins mit upsert
+      const { error: coinsError } = await supabase
+        .from('inventory_currencies')
+        .upsert(newCoins, {
+          onConflict: 'inventory_id'
+        });
+
+      if (coinsError) throw coinsError;
+    }
+
+    // 4. Erstelle den Trade
+    const tradeData = {
+      group_id: groupId,
+      initiator_id: initiatorId,
+      receiver_id: receiverId,
+      offered_item_id: offeredItem?.id || null,
+      offered_item_quantity: offeredItem?.quantity || null,
+      offered_coins: offeredCoins || null,
+      status: 'pending'
+    };
+
+    const { data, error } = await supabase
+      .from('trades')
+      .insert([tradeData])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+
+  } catch (error) {
+    console.error('Error in createTradeOffer:', error);
     throw error;
   }
-  return data;
 }
 
 // Mache ein Gegenangebot
@@ -88,60 +157,147 @@ export async function makeCounterOffer(
   counterItemQuantity?: number,
   counterCoins?: { copper: number; silver: number; gold: number; platinum: number }
 ): Promise<Trade> {
-  // Zuerst den bestehenden Trade laden
-  const { data: existingTrade } = await supabase
-    .from('trades')
-    .select('*')
-    .eq('id', tradeId)
-    .single();
+  try {
+    // 1. Hole den bestehenden Trade
+    const { data: existingTrade, error: tradeError } = await supabase
+      .from('trades')
+      .select('*')
+      .eq('id', tradeId)
+      .single();
 
-  if (!existingTrade) {
-    throw new Error('Trade not found');
-  }
+    if (tradeError) throw tradeError;
+    if (!existingTrade) throw new Error('Trade not found');
+    if (existingTrade.status !== 'pending') throw new Error('Trade is not in pending state');
 
-  // Dann Update mit allen bestehenden Werten
-  const { data, error } = await supabase
-    .from('trades')
-    .upsert({
-      ...existingTrade,
-      status: 'counter_offered',
-      counter_item_id: counterItemId || null,
-      counter_item_quantity: counterItemQuantity || null,
-      counter_coins: counterCoins || null
-    })
-    .select(`
-      *,
-      initiator:initiator_id(username, avatar_url),
-      receiver:receiver_id(username, avatar_url),
-      offered_item:inventory_items!offered_item_id(
-        all_items (
-          name,
-          description,
-          category,
-          weight
+    // 2. Hole das Inventar des Empfängers
+    const { data: receiverInventory, error: inventoryError } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('group_id', existingTrade.group_id)
+      .eq('user_id', existingTrade.receiver_id)
+      .single();
+
+    if (inventoryError) throw inventoryError;
+
+    // 3. Wenn ein Item angeboten wird, prüfe die Verfügbarkeit und ziehe es ab
+    if (counterItemId && counterItemQuantity) {
+      // Prüfe, ob das Item im Inventar existiert und genügend Menge vorhanden ist
+      const { data: currentItem, error: fetchError } = await supabase
+        .from('inventory_items')
+        .select('quantity, item_id, item_type, inventory_id')
+        .eq('id', counterItemId)
+        .eq('inventory_id', receiverInventory.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!currentItem) throw new Error('Item not found in inventory');
+      if (currentItem.quantity < counterItemQuantity) throw new Error('Not enough items available');
+
+      // Berechne die neue Menge
+      const newQuantity = currentItem.quantity - counterItemQuantity;
+
+      // Aktualisiere die Menge mit upsert
+      const { error: itemError } = await supabase
+        .from('inventory_items')
+        .upsert({
+          id: counterItemId,
+          inventory_id: receiverInventory.id,
+          item_id: currentItem.item_id,
+          item_type: currentItem.item_type,
+          quantity: newQuantity
+        });
+
+      if (itemError) throw itemError;
+    }
+
+    // 4. Wenn Coins angeboten werden, prüfe die Verfügbarkeit und ziehe sie ab
+    if (counterCoins && (counterCoins.copper > 0 || counterCoins.silver > 0 || counterCoins.gold > 0 || counterCoins.platinum > 0)) {
+      // Hole zuerst die aktuellen Coins
+      const { data: currentCoins, error: fetchError } = await supabase
+        .from('inventory_currencies')
+        .select('copper, silver, gold, platinum')
+        .eq('inventory_id', receiverInventory.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Prüfe, ob genügend Coins vorhanden sind
+      if (currentCoins.copper < (counterCoins.copper || 0) ||
+          currentCoins.silver < (counterCoins.silver || 0) ||
+          currentCoins.gold < (counterCoins.gold || 0) ||
+          currentCoins.platinum < (counterCoins.platinum || 0)) {
+        throw new Error('Not enough coins available');
+      }
+
+      // Berechne die neuen Werte
+      const newCoins = {
+        inventory_id: receiverInventory.id,
+        copper: currentCoins.copper - (counterCoins.copper || 0),
+        silver: currentCoins.silver - (counterCoins.silver || 0),
+        gold: currentCoins.gold - (counterCoins.gold || 0),
+        platinum: currentCoins.platinum - (counterCoins.platinum || 0)
+      };
+
+      // Aktualisiere die Coins
+      const { error: coinsError } = await supabase
+        .from('inventory_currencies')
+        .upsert(newCoins, {
+          onConflict: 'inventory_id'
+        });
+
+      if (coinsError) throw coinsError;
+    }
+
+    // 5. Aktualisiere den Trade mit dem Gegenangebot
+    const { data, error } = await supabase
+      .from('trades')
+      .upsert({
+        ...existingTrade,
+        status: 'counter_offered',
+        counter_item_id: counterItemId || null,
+        counter_item_quantity: counterItemQuantity || null,
+        counter_coins: counterCoins ? {
+          copper: counterCoins.copper || 0,
+          silver: counterCoins.silver || 0,
+          gold: counterCoins.gold || 0,
+          platinum: counterCoins.platinum || 0
+        } : null
+      })
+      .select(`
+        *,
+        initiator:initiator_id(username, avatar_url),
+        receiver:receiver_id(username, avatar_url),
+        offered_item:inventory_items!offered_item_id(
+          all_items (
+            name,
+            description,
+            category,
+            weight
+          )
+        ),
+        counter_item:inventory_items!counter_item_id(
+          all_items (
+            name,
+            description,
+            category,
+            weight
+          )
         )
-      ),
-      counter_item:inventory_items!counter_item_id(
-        all_items (
-          name,
-          description,
-          category,
-          weight
-        )
-      )
-    `)
-    .single();
+      `)
+      .single();
 
-  if (error) {
+    if (error) throw error;
+
+    return {
+      ...data,
+      offered_item: data.offered_item?.all_items,
+      counter_item: data.counter_item?.all_items
+    };
+
+  } catch (error) {
     console.error('Error in makeCounterOffer:', error);
     throw error;
   }
-
-  return {
-    ...data,
-    offered_item: data.offered_item?.all_items,
-    counter_item: data.counter_item?.all_items
-  };
 }
 
 // Funktion zum Ausführen des Trades
@@ -183,7 +339,98 @@ export async function acceptTrade(tradeId: string): Promise<void> {
   }
 
   try {
-    // 1. Zuerst den Trade als akzeptiert markieren
+    // 1. Hole die Inventare
+    const { data: receiverInventory, error: receiverError } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('group_id', existingTrade.group_id)
+      .eq('user_id', existingTrade.receiver_id)
+      .single();
+
+    if (receiverError) throw receiverError;
+
+    // 2. Wenn ein Item angeboten wurde, füge es dem Empfänger hinzu
+    if (existingTrade.offered_item_id && existingTrade.offered_item_quantity) {
+      // Hole zuerst das ursprüngliche Item, um den item_type und die item_id zu bekommen
+      const { data: originalItem, error: originalItemError } = await supabase
+        .from('inventory_items')
+        .select('item_type, item_id')
+        .eq('id', existingTrade.offered_item_id)
+        .single();
+
+      if (originalItemError) throw originalItemError;
+
+      // Prüfe, ob das Item bereits im Inventar des Empfängers existiert
+      const { data: existingInventoryItem, error: checkError } = await supabase
+        .from('inventory_items')
+        .select('id, quantity')
+        .eq('inventory_id', receiverInventory.id)
+        .eq('item_id', originalItem.item_id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 bedeutet "no rows returned"
+        throw checkError;
+      }
+
+      if (existingInventoryItem) {
+        // Wenn das Item existiert, erhöhe die Quantity
+        const { error: updateError } = await supabase
+          .from('inventory_items')
+          .upsert({
+            id: existingInventoryItem.id,
+            inventory_id: receiverInventory.id,
+            item_id: originalItem.item_id,
+            item_type: originalItem.item_type,
+            quantity: existingInventoryItem.quantity + existingTrade.offered_item_quantity
+          });
+
+        if (updateError) throw updateError;
+      } else {
+        // Wenn das Item nicht existiert, erstelle ein neues
+        const { error: insertError } = await supabase
+          .from('inventory_items')
+          .insert({
+            inventory_id: receiverInventory.id,
+            item_id: originalItem.item_id,
+            item_type: originalItem.item_type,
+            quantity: existingTrade.offered_item_quantity
+          });
+
+        if (insertError) throw insertError;
+      }
+    }
+
+    // 3. Wenn Coins angeboten wurden, füge sie dem Empfänger hinzu
+    if (existingTrade.offered_coins) {
+      // Hole zuerst die aktuellen Coins des Empfängers
+      const { data: currentCoins, error: fetchError } = await supabase
+        .from('inventory_currencies')
+        .select('copper, silver, gold, platinum')
+        .eq('inventory_id', receiverInventory.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Berechne die neuen Werte
+      const newCoins = {
+        inventory_id: receiverInventory.id,
+        copper: currentCoins.copper + (existingTrade.offered_coins.copper || 0),
+        silver: currentCoins.silver + (existingTrade.offered_coins.silver || 0),
+        gold: currentCoins.gold + (existingTrade.offered_coins.gold || 0),
+        platinum: currentCoins.platinum + (existingTrade.offered_coins.platinum || 0)
+      };
+
+      // Aktualisiere die Coins
+      const { error: coinsError } = await supabase
+        .from('inventory_currencies')
+        .upsert(newCoins, {
+          onConflict: 'inventory_id'
+        });
+
+      if (coinsError) throw coinsError;
+    }
+
+    // 4. Markiere den Trade als akzeptiert
     const { error: updateError } = await supabase
       .from('trades')
       .upsert({
@@ -193,39 +440,13 @@ export async function acceptTrade(tradeId: string): Promise<void> {
 
     if (updateError) throw updateError;
 
-    // 2. Den Transfer ausführen
-    await executeTradeTransfer(existingTrade);
-
-    // 3. Den Trade löschen
+    // 5. Lösche den Trade
     const { error: deleteTradeError } = await supabase
       .from('trades')
       .delete()
       .eq('id', tradeId);
 
     if (deleteTradeError) throw deleteTradeError;
-
-    // 4. Erst jetzt die Items mit Quantity 0 löschen
-    const { data: initiatorInventory } = await supabase
-      .from('group_inventories')
-      .select('id')
-      .eq('group_id', existingTrade.group_id)
-      .eq('user_id', existingTrade.initiator_id)
-      .single();
-
-    const { data: receiverInventory } = await supabase
-      .from('group_inventories')
-      .select('id')
-      .eq('group_id', existingTrade.group_id)
-      .eq('user_id', existingTrade.receiver_id)
-      .single();
-
-    const { error: cleanupError } = await supabase
-      .from('inventory_items')
-      .delete()
-      .in('inventory_id', [initiatorInventory.id, receiverInventory.id])
-      .eq('quantity', 0);
-
-    if (cleanupError) throw cleanupError;
 
   } catch (error) {
     console.error('Error in acceptTrade:', error);
@@ -279,12 +500,87 @@ export async function completeTrade(tradeId: string): Promise<Trade> {
 // Breche einen Handel ab
 export async function cancelTrade(tradeId: string): Promise<void> {
   try {
-    const { error } = await supabase
+    // 1. Hole den Trade
+    const { data: trade, error: tradeError } = await supabase
+      .from('trades')
+      .select('*')
+      .eq('id', tradeId)
+      .single();
+
+    if (tradeError) throw tradeError;
+
+    // 2. Hole das Inventar des Initiators
+    const { data: initiatorInventory, error: inventoryError } = await supabase
+      .from('group_inventories')
+      .select('id')
+      .eq('group_id', trade.group_id)
+      .eq('user_id', trade.initiator_id)
+      .single();
+
+    if (inventoryError) throw inventoryError;
+
+    // 3. Wenn ein Item angeboten wurde, gib es zurück
+    if (trade.offered_item_id && trade.offered_item_quantity) {
+      // Hole zuerst die aktuelle Menge
+      const { data: currentItem, error: fetchError } = await supabase
+        .from('inventory_items')
+        .select('quantity, item_id')
+        .eq('id', trade.offered_item_id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Berechne die neue Menge
+      const newQuantity = currentItem.quantity + trade.offered_item_quantity;
+
+      // Aktualisiere die Menge mit upsert
+      const { error: itemError } = await supabase
+        .from('inventory_items')
+        .upsert({
+          id: trade.offered_item_id,
+          item_id: currentItem.item_id,
+          quantity: newQuantity
+        });
+
+      if (itemError) throw itemError;
+    }
+
+    // 4. Wenn Coins angeboten wurden, gib sie zurück
+    if (trade.offered_coins) {
+      // Hole zuerst die aktuellen Coins
+      const { data: currentCoins, error: fetchError } = await supabase
+        .from('inventory_currencies')
+        .select('copper, silver, gold, platinum')
+        .eq('inventory_id', initiatorInventory.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Berechne die neuen Werte
+      const newCoins = {
+        inventory_id: initiatorInventory.id,
+        copper: currentCoins.copper + (trade.offered_coins.copper || 0),
+        silver: currentCoins.silver + (trade.offered_coins.silver || 0),
+        gold: currentCoins.gold + (trade.offered_coins.gold || 0),
+        platinum: currentCoins.platinum + (trade.offered_coins.platinum || 0)
+      };
+
+      // Aktualisiere die Coins
+      const { error: coinsError } = await supabase
+        .from('inventory_currencies')
+        .upsert(newCoins);
+
+      if (coinsError) throw coinsError;
+    }
+
+    // 5. Lösche den Trade
+    const { error: deleteError } = await supabase
       .from('trades')
       .delete()
       .eq('id', tradeId);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
+
   } catch (error) {
     console.error('Error in cancelTrade:', error);
     throw error;

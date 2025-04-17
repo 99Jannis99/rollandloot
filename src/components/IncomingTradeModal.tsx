@@ -5,6 +5,7 @@ import { CurrencyDisplay } from './CurrencyDisplay';
 import { getUserInventoryItems } from '../services/groupService';
 import { useUser } from '@clerk/clerk-react';
 import { syncUser } from '../services/userService';
+import { supabase } from '../lib/supabase';
 
 interface IncomingTradeModalProps {
   trade: Trade;
@@ -34,6 +35,15 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [selectedQuantity, setSelectedQuantity] = useState<number>(1);
+  const [coins, setCoins] = useState<{ copper: number; silver: number; gold: number; platinum: number }>({
+    copper: 0,
+    silver: 0,
+    gold: 0,
+    platinum: 0
+  });
+  const [currentCoins, setCurrentCoins] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     async function loadInventoryItems() {
@@ -53,6 +63,31 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
 
     loadInventoryItems();
   }, [user, trade.group_id]);
+
+  useEffect(() => {
+    const loadCurrentCoins = async () => {
+      const { data: inventory } = await supabase
+        .from('group_inventories')
+        .select('id')
+        .eq('group_id', trade.group_id)
+        .eq('user_id', trade.receiver_id)
+        .single();
+
+      if (inventory) {
+        const { data: currencies } = await supabase
+          .from('inventory_currencies')
+          .select('copper, silver, gold, platinum')
+          .eq('inventory_id', inventory.id)
+          .single();
+
+        if (currencies) {
+          setCurrentCoins(currencies);
+        }
+      }
+    };
+
+    loadCurrentCoins();
+  }, [trade.group_id, trade.receiver_id]);
 
   async function handleMakeCounterOffer() {
     try {
@@ -198,23 +233,58 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
           <div>
             <h3 className="text-sm font-medium text-gray-300 mb-2">Offer Coins:</h3>
             <div className="grid grid-cols-2 gap-4">
-              {Object.entries(counterCoins).map(([type, amount]) => (
-                <div key={type}>
-                  <label className="block text-sm text-gray-400 mb-1 capitalize">
-                    {type}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setCounterCoins(prev => ({
-                      ...prev,
-                      [type]: parseInt(e.target.value) || 0
-                    }))}
-                    className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10"
-                  />
-                </div>
-              ))}
+              <div>
+                <label className="block text-sm font-medium text-gray-400">
+                  Copper (Current: {currentCoins.copper || 0})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={currentCoins.copper || 0}
+                  value={coins.copper}
+                  onChange={(e) => setCoins({ ...coins, copper: parseInt(e.target.value) || 0 })}
+                  className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400">
+                  Silver (Current: {currentCoins.silver || 0})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={currentCoins.silver || 0}
+                  value={coins.silver}
+                  onChange={(e) => setCoins({ ...coins, silver: parseInt(e.target.value) || 0 })}
+                  className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400">
+                  Gold (Current: {currentCoins.gold || 0})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={currentCoins.gold || 0}
+                  value={coins.gold}
+                  onChange={(e) => setCoins({ ...coins, gold: parseInt(e.target.value) || 0 })}
+                  className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400">
+                  Platinum (Current: {currentCoins.platinum || 0})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={currentCoins.platinum || 0}
+                  value={coins.platinum}
+                  onChange={(e) => setCoins({ ...coins, platinum: parseInt(e.target.value) || 0 })}
+                  className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600"
+                />
+              </div>
             </div>
           </div>
 

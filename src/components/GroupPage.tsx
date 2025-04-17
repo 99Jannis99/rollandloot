@@ -7,8 +7,9 @@ import { GroupInventoryOverview } from "./GroupInventoryOverview";
 import { InviteFriendsToGroup } from "./InviteFriendsToGroup";
 import { syncUser } from "../services/userService";
 import { EditGroupMembersModal } from "./EditGroupMembersModal";
-import { GroupNotes } from './GroupNotes';
-import { TradeNotifications } from './TradeNotifications';
+import { GroupNotes } from "./GroupNotes";
+import { TradeNotifications } from "./TradeNotifications";
+import { ActiveTrades } from "../components/ActiveTrades";
 
 interface Group {
   id: string;
@@ -117,7 +118,7 @@ export function GroupPage() {
   }
 
   return (
-    <div>
+    <div className="container mx-auto px-4 py-8">
       <div className="mb-8 bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
         <div className="flex justify-between items-start">
           <div>
@@ -177,13 +178,16 @@ export function GroupPage() {
               </div>
             )}
           </div>
-          
+
           <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-              <GroupNotes groupId={group.id} />
-            </div>
+            <GroupNotes groupId={group.id} />
+          </div>
+          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+            <ActiveTrades groupId={group.id} />
+          </div>
         </div>
       </div>
-      
+
       <TradeNotifications groupId={group.id} />
     </div>
   );

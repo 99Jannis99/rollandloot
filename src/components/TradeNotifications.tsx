@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useUser } from "@clerk/clerk-react";
 import {
   Trade,
@@ -19,24 +19,12 @@ export function TradeNotifications({ groupId }: TradeNotificationsProps) {
   const { user } = useUser();
   const [incomingTrades, setIncomingTrades] = useState<Trade[]>([]);
   const [counterOffers, setCounterOffers] = useState<Trade[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<any>(null);
+  const subscriptionRef = useRef<any>(null);
 
-  useEffect(() => {
-    const initSupabaseUser = async () => {
-      if (!user) return;
-      try {
-        const supabaseUserData = await syncUser(user);
-        setSupabaseUser(supabaseUserData);
-      } catch (error) {
-        console.error("Error syncing user:", error);
-      }
-    };
-    
-    initSupabaseUser();
-  }, [user]);
+  // Memoized channel ID
+  const channelId = useMemo(() => `trades_${user?.id}`, [user?.id]);
 
   const loadTrades = useCallback(async () => {
     if (!user || !supabaseUser) return;
@@ -54,90 +42,89 @@ export function TradeNotifications({ groupId }: TradeNotificationsProps) {
       setCounterOffers(filteredOffers);
     } catch (error) {
       console.error("Error loading trades:", error);
-      setError(error instanceof Error ? error.message : "Failed to load trades");
     }
   }, [user, groupId, supabaseUser]);
 
+  // Initialisiere SupabaseUser und lade Trades
   useEffect(() => {
-    loadTrades();
-  }, [loadTrades]);
+    const initSupabaseUser = async () => {
+      if (!user) return;
+      try {
+        const supabaseUserData = await syncUser(user);
+        setSupabaseUser(supabaseUserData);
+      } catch (error) {
+        console.error("Error syncing user:", error);
+      }
+    };
+    
+    initSupabaseUser();
+  }, [user]);
 
   useEffect(() => {
+    if (supabaseUser && user) {
+      loadTrades();
+    }
+  }, [supabaseUser, user, loadTrades]);
+
+  // Subscription Setup
+  useEffect(() => {
     if (!user?.id || !supabaseUser) {
+      console.log("Subscription nicht gestartet: Kein User oder SupabaseUser");
       return;
     }
 
-    let isSubscribed = true;
-    const channelId = `trades_${user.id}_${Math.random()}`;
+    console.log("Starte Subscription Setup für User:", user.id);
+    const setupSubscription = async () => {
+      try {
+        const channel = supabase.channel(channelId);
+        subscriptionRef.current = channel;
 
-    try {
-      const channel = supabase.channel(channelId)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "trades",
-          },
-          async (payload) => {
-            if (payload.new?.status === "pending") {
-              const tradeData = payload.new as Trade;
-              
-              if (tradeData.group_id === groupId && 
-                 (tradeData.receiver_id === supabaseUser.id || 
-                  tradeData.initiator_id === supabaseUser.id)) {
-                
-                if (isSubscribed) {
-                  await loadTrades();
-                }
-              }
-            }
+        const handleTradeUpdate = (payload: any) => {
+          if (!subscriptionRef.current) return;
+          
+          const tradeData = payload.new as Trade;
+          if (
+            tradeData.group_id === groupId &&
+            (tradeData.receiver_id === supabaseUser.id || tradeData.initiator_id === supabaseUser.id)
+          ) {
+            loadTrades();
           }
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "trades",
-          },
-          async (payload) => {
-            const tradeData = payload.new as Trade;
-            
-            if (tradeData.group_id === groupId && 
-               (tradeData.receiver_id === supabaseUser.id || 
-                tradeData.initiator_id === supabaseUser.id)) {
-              
-              if (tradeData.status === "counter_offered") {
-                if (isSubscribed) {
-                  await loadTrades();
-                }
-              }
-            }
-          }
-        );
+        };
 
-      channel.subscribe((status) => {
-        if (status === "CHANNEL_ERROR") {
-          console.error("Fehler bei der Trade-Subscription");
-        }
-      });
+        const handleDelete = (payload: any) => {
+          if (!subscriptionRef.current) return;
+          
+          setIncomingTrades(prevTrades => prevTrades.filter(trade => trade.id !== payload.old.id));
+          setCounterOffers(prevOffers => prevOffers.filter(trade => trade.id !== payload.old.id));
+        };
 
-      return () => {
-        isSubscribed = false;
-        channel.unsubscribe();
-      };
-    } catch (error) {
-      console.error("Fehler beim Setup der Trade-Subscription:", error);
-    }
-  }, [user?.id, groupId, loadTrades, supabaseUser]);
+        channel
+          .on("postgres_changes", { event: "INSERT", schema: "public", table: "trades" }, handleTradeUpdate)
+          .on("postgres_changes", { event: "UPDATE", schema: "public", table: "trades" }, handleTradeUpdate)
+          .on("postgres_changes", { event: "DELETE", schema: "public", table: "trades" }, handleDelete);
+
+        await channel.subscribe();
+      } catch (error) {
+        console.error("Fehler beim Setup der Subscription:", error);
+      }
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (subscriptionRef.current) {
+        console.log("Cleanup: Unsubscribe Channel");
+        subscriptionRef.current.unsubscribe();
+      }
+    };
+  }, [user?.id, groupId, supabaseUser, channelId, loadTrades]);
 
   async function handleAcceptTrade(tradeId: string) {
     try {
       await acceptTrade(tradeId);
       loadTrades();
     } catch (err) {
-      console.error('Error accepting trade:', err);
+      console.error("Error accepting trade:", err);
     }
   }
 
@@ -146,7 +133,7 @@ export function TradeNotifications({ groupId }: TradeNotificationsProps) {
       await cancelTrade(tradeId);
       loadTrades();
     } catch (err) {
-      console.error('Error declining trade:', err);
+      console.error("Error declining trade:", err);
     }
   }
 

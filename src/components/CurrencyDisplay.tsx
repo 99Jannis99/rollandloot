@@ -14,9 +14,10 @@ interface CurrencyDisplayProps {
   currencies: Currency[];
   isDM: boolean;
   onUpdate?: (currencies: Currency[]) => void;
+  readOnly?: boolean;
 }
 
-export function CurrencyDisplay({ currencies, isDM, onUpdate }: CurrencyDisplayProps) {
+export function CurrencyDisplay({ currencies, isDM, onUpdate, readOnly = false }: CurrencyDisplayProps) {
   const [editValues, setEditValues] = useState<{ [key: string]: string }>(
     currencies.reduce((acc, curr) => ({
       ...acc,
@@ -57,10 +58,10 @@ export function CurrencyDisplay({ currencies, isDM, onUpdate }: CurrencyDisplayP
   };
 
   return (
-    <div className="bg-black/20 rounded-lg p-3 mb-4">
+    <div className="mb-4">
       <div className="flex flex-wrap justify-between gap-2">
         {currencies.map((currency) => (
-          <div key={currency.type} className="flex items-center gap-2">
+          <div key={currency.type} className="flex items-center gap-2 bg-black/20 rounded-lg p-3">
             <img 
               src={currencyIcons[currency.type]} 
               alt={currency.type}
@@ -68,36 +69,38 @@ export function CurrencyDisplay({ currencies, isDM, onUpdate }: CurrencyDisplayP
             />
             <span className="text-sm text-gray-400 w-24">{currencySymbols[currency.type]}</span>
             <span className="w-16 text-right">{currency.amount}</span>
-            <div className="flex items-center space-x-1">
-              <input
-                type="number"
-                min="1"
-                value={editValues[currency.type]}
-                onChange={(e) => handleInputChange(currency.type, e.target.value)}
-                className="w-16 px-2 py-1 bg-black/30 border border-white/10 rounded text-sm"
-                placeholder="1"
-              />
-              {isDM && (
+            {!readOnly && (
+              <div className="flex items-center space-x-1">
+                <input
+                  type="number"
+                  min="1"
+                  value={editValues[currency.type]}
+                  onChange={(e) => handleInputChange(currency.type, e.target.value)}
+                  className="w-16 px-2 py-1 bg-black/30 border border-white/10 rounded text-sm"
+                  placeholder="1"
+                />
+                {isDM && (
+                  <button
+                    onClick={() => handleQuantityChange(
+                      currency.type,
+                      parseInt(editValues[currency.type] || '0')
+                    )}
+                    className="p-1 bg-green-600/10 text-green-400 hover:bg-green-600/20 rounded"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => handleQuantityChange(
                     currency.type,
-                    parseInt(editValues[currency.type] || '0')
+                    -parseInt(editValues[currency.type] || '1')
                   )}
-                  className="p-1 bg-green-600/10 text-green-400 hover:bg-green-600/20 rounded"
+                  className="p-1 bg-yellow-600/10 text-yellow-400 hover:bg-yellow-600/20 rounded"
                 >
-                  <PlusIcon className="w-4 h-4" />
+                  <MinusIcon className="w-4 h-4" />
                 </button>
-              )}
-              <button
-                onClick={() => handleQuantityChange(
-                  currency.type,
-                  -parseInt(editValues[currency.type] || '1')
-                )}
-                className="p-1 bg-yellow-600/10 text-yellow-400 hover:bg-yellow-600/20 rounded"
-              >
-                <MinusIcon className="w-4 h-4" />
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
