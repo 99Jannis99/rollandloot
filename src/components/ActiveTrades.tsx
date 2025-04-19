@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Trade, getActiveTrades, cancelTrade } from "../services/tradeService";
+import { Trade, getActiveTrades, cancelTrade, acceptTrade } from "../services/tradeService";
 import { useUser } from "@clerk/clerk-react";
 import { syncUser } from "../services/userService";
 import { CurrencyDisplay } from "./CurrencyDisplay";
@@ -116,6 +116,16 @@ export function ActiveTrades({ groupId }: ActiveTradesProps) {
     }
   };
 
+  const handleAcceptTrade = async (tradeId: string) => {
+    try {
+      await acceptTrade(tradeId);
+      await loadTrades();
+    } catch (err) {
+      console.error("Error accepting trade:", err);
+      setError("Failed to accept trade");
+    }
+  };
+
   if (loading) return <div className="text-gray-400">Loading trades...</div>;
   if (error) return <div className="text-red-400">{error}</div>;
   if (trades.length === 0) return null;
@@ -129,7 +139,7 @@ export function ActiveTrades({ groupId }: ActiveTradesProps) {
             key={trade.id}
             className="bg-gray-800/50 rounded-lg p-4 border border-white/10"
           >
-            <div className="flex flex-col space-y-3">
+            <div className="flex flex-col space-y-4">
               <div className="text-sm text-gray-400 truncate">
                 {trade.initiator?.username?.length > 20
                   ? `${trade.initiator.username.slice(0, 20)}...`
@@ -139,43 +149,38 @@ export function ActiveTrades({ groupId }: ActiveTradesProps) {
                   ? `${trade.receiver.username.slice(0, 20)}...`
                   : trade.receiver?.username}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="space-y-4">
+                {/* Offer Section */}
+                <div className="space-y-2 bg-black/20 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-300">Offering:</h4>
                   {trade.offered_item && (
                     <div className="text-sm">
-                      <div className="mb-4">
-                        <div className="flex flex-wrap justify-between gap-2">
-                          Offering:
-                        </div>
-                      </div>
-                      <div className="mb-4">
-                        <div className="flex flex-wrap justify-between gap-2">
-                          <div className="flex items-center gap-2 bg-black/20 rounded-lg p-3">
-                            {trade.offered_item.name} (x
-                            {trade.offered_item_quantity})
-                          </div>
-                        </div>
+                      <div className="flex items-center gap-2 rounded-lg">
+                        {trade.offered_item.name} (x{trade.offered_item_quantity})
                       </div>
                     </div>
                   )}
                   {trade.offered_coins && (
-                    <div>
+                    <div className="mt-2">
                       <CurrencyDisplay
                         currencies={[
                           {
-                            type: "copper",
+                            type: "copper" as const,
                             amount: trade.offered_coins.copper,
                           },
                           {
-                            type: "silver",
+                            type: "silver" as const,
                             amount: trade.offered_coins.silver,
                           },
-                          { type: "gold", amount: trade.offered_coins.gold },
+                          { 
+                            type: "gold" as const, 
+                            amount: trade.offered_coins.gold 
+                          },
                           {
-                            type: "platinum",
+                            type: "platinum" as const,
                             amount: trade.offered_coins.platinum,
                           },
-                        ]}
+                        ].filter(currency => currency.amount > 0)}
                         isDM={false}
                         readOnly={true}
                       />
@@ -183,45 +188,61 @@ export function ActiveTrades({ groupId }: ActiveTradesProps) {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  {trade.counter_item && (
-                    <div className="text-sm">
-                      Counter Offer: {trade.counter_item.name} (x
-                      {trade.counter_item_quantity})
-                    </div>
-                  )}
-                  {trade.counter_coins && (
-                    <div>
-                      <CurrencyDisplay
-                        currencies={[
-                          {
-                            type: "copper",
-                            amount: trade.counter_coins.copper,
-                          },
-                          {
-                            type: "silver",
-                            amount: trade.counter_coins.silver,
-                          },
-                          { type: "gold", amount: trade.counter_coins.gold },
-                          {
-                            type: "platinum",
-                            amount: trade.counter_coins.platinum,
-                          },
-                        ]}
-                        isDM={false}
-                        readOnly={true}
-                      />
-                    </div>
-                  )}
-                </div>
+                {/* Counter Offer Section */}
+                {(trade.counter_item || trade.counter_coins) && (
+                  <div className="space-y-2 bg-violet-500/10 rounded-lg p-4 border border-violet-500/20">
+                    <h4 className="text-sm font-medium text-violet-300">Counter Offer:</h4>
+                    {trade.counter_item && (
+                      <div className="text-sm">
+                        <div className="flex items-center gap-2 rounded-lg">
+                          {trade.counter_item.name} (x{trade.counter_item_quantity})
+                        </div>
+                      </div>
+                    )}
+                    {trade.counter_coins && (
+                      <div className="mt-2">
+                        <CurrencyDisplay
+                          currencies={[
+                            {
+                              type: "copper" as const,
+                              amount: trade.counter_coins.copper,
+                            },
+                            {
+                              type: "silver" as const,
+                              amount: trade.counter_coins.silver,
+                            },
+                            { 
+                              type: "gold" as const, 
+                              amount: trade.counter_coins.gold 
+                            },
+                            {
+                              type: "platinum" as const,
+                              amount: trade.counter_coins.platinum,
+                            },
+                          ].filter(currency => currency.amount > 0)}
+                          isDM={false}
+                          readOnly={true}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end gap-2">
+                {trade.status === 'counter_offered' && trade.initiator_id === supabaseUser?.id && (
+                  <button
+                    onClick={() => handleAcceptTrade(trade.id)}
+                    className="px-3 py-1 text-sm bg-green-600/20 text-green-400 hover:bg-green-600/30 rounded-lg"
+                  >
+                    Accept
+                  </button>
+                )}
                 <button
                   onClick={() => handleCancelTrade(trade.id)}
                   className="px-3 py-1 text-sm bg-red-600/10 text-red-400 hover:bg-red-600/20 rounded-lg"
                 >
-                  Cancel
+                  {trade.status === 'counter_offered' && trade.initiator_id === supabaseUser?.id ? 'Decline' : 'Cancel'}
                 </button>
               </div>
             </div>

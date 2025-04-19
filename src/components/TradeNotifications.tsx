@@ -141,29 +141,6 @@ export function TradeNotifications({ groupId }: TradeNotificationsProps) {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">
-      {/* Eingehende Handelsangebote */}
-      {incomingTrades.map((trade) => (
-        <div
-          key={trade.id}
-          className="bg-gray-800 rounded-lg p-4 border border-white/10 shadow-lg animate-slide-in"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium">New Trade Offer</h3>
-              <p className="text-sm text-gray-400">
-                From: {trade.initiator?.username}
-              </p>
-            </div>
-            <button
-              onClick={() => setSelectedTrade(trade)}
-              className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700"
-            >
-              View Offer
-            </button>
-          </div>
-        </div>
-      ))}
-
       {/* Counter-Offers */}
       {counterOffers.map((trade) => (
         <div
@@ -174,7 +151,12 @@ export function TradeNotifications({ groupId }: TradeNotificationsProps) {
             <div>
               <h3 className="font-medium">Counter Offer Received</h3>
               <p className="text-sm text-gray-400">
-                From: {trade.receiver?.username}
+                From:{" "}
+                <span title={trade.receiver?.username || ""} className="truncate">
+                  {trade.receiver?.username?.length > 20
+                    ? `${trade.receiver.username.slice(0, 20)}...`
+                    : trade.receiver?.username}
+                </span>
               </p>
             </div>
 
@@ -202,17 +184,45 @@ export function TradeNotifications({ groupId }: TradeNotificationsProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => handleAcceptTrade(trade.id)}
-                className="flex-1 px-3 py-1 bg-green-600/20 text-green-400 rounded hover:bg-green-600/30"
+                className="px-3 py-1 text-sm bg-green-600/20 text-green-400 hover:bg-green-600/30 rounded-lg"
               >
                 Accept
               </button>
               <button
                 onClick={() => handleDeclineTrade(trade.id)}
-                className="flex-1 px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30"
+                className="px-3 py-1 text-sm bg-red-600/10 text-red-400 hover:bg-red-600/20 rounded-lg"
               >
                 Decline
               </button>
             </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Eingehende Handelsangebote */}
+      {incomingTrades.map((trade) => (
+        <div
+          key={trade.id}
+          className="bg-gray-800 rounded-lg p-4 border border-white/10 shadow-lg animate-slide-in"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-medium">New Trade Offer</h3>
+              <p className="text-sm text-gray-400">
+                From:{" "}
+                <span title={trade.initiator?.username || ""} className="truncate">
+                  {trade.initiator?.username?.length > 20
+                    ? `${trade.initiator.username.slice(0, 20)}...`
+                    : trade.initiator?.username}
+                </span>
+              </p>
+            </div>
+            <button
+              onClick={() => setSelectedTrade(trade)}
+              className="px-3 py-1 text-sm bg-violet-600 text-white hover:bg-violet-700 rounded-lg"
+            >
+              View Offer
+            </button>
           </div>
         </div>
       ))}

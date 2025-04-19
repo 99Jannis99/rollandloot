@@ -51,7 +51,7 @@ export function SelectTradePartnerModal({ groupId, onClose, onPartnerSelected }:
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md relative">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm relative">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-gray-400 hover:text-gray-300"
@@ -78,14 +78,24 @@ export function SelectTradePartnerModal({ groupId, onClose, onPartnerSelected }:
                   onPartnerSelected(member.user_id);
                   onClose();
                 }}
-                className="flex items-center gap-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
+                className="flex items-center gap-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors w-full group"
               >
                 <img
                   src={member.users.avatar_url}
                   alt={member.users.username}
-                  className="w-10 h-10 rounded-full"
+                  className="w-10 h-10 rounded-full flex-shrink-0"
                 />
-                <span className="font-medium">{member.users.username}</span>
+                <div className="min-w-0 flex-1 max-w-[180px]">
+                  <div 
+                    className="font-medium truncate text-left"
+                    title={member.users.username}
+                  >
+                    {member.users.username}
+                  </div>
+                </div>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-gray-400 flex-shrink-0">
+                  Auswählen
+                </div>
               </button>
             ))}
 

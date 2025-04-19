@@ -109,7 +109,7 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md relative">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md relative max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-500/70">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-gray-400 hover:text-gray-300"
@@ -127,20 +127,22 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
 
         {/* Zeige angebotene Items/Münzen */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-300 mb-2">Offered Items:</h3>
           {trade.offered_item_id && trade.offered_item && (
-            <div className="p-3 bg-black/20 rounded-lg">
-              <div className="font-medium">{trade.offered_item.name}</div>
-              <div className="text-sm text-gray-400 mt-1">
-                {trade.offered_item.description}
+            <>
+              <h3 className="text-sm font-medium text-gray-300 mb-2">Offered Items:</h3>
+              <div className="p-3 bg-black/20 rounded-lg">
+                <div className="font-medium">{trade.offered_item.name}</div>
+                <div className="text-sm text-gray-400 mt-1">
+                  {trade.offered_item.description}
+                </div>
+                <div className="text-sm text-gray-400">
+                  Category: {trade.offered_item.category} | Weight: {trade.offered_item.weight}
+                </div>
+                <div className="text-sm text-violet-400 mt-1">
+                  Quantity: {trade.offered_item_quantity}
+                </div>
               </div>
-              <div className="text-sm text-gray-400">
-                Category: {trade.offered_item.category} | Weight: {trade.offered_item.weight}
-              </div>
-              <div className="text-sm text-violet-400 mt-1">
-                Quantity: {trade.offered_item_quantity}
-              </div>
-            </div>
+            </>
           )}
           {trade.offered_coins && (
             <div className="mt-2">
@@ -174,7 +176,7 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
                   maxQuantity: selectedItem?.quantity || 1
                 });
               }}
-              className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10"
+              className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10 focus:border-violet-500 focus:outline-none"
             >
               <option value="">Select an item...</option>
               {inventoryItems.map((item) => (
@@ -204,7 +206,7 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
                         }));
                       }
                     }}
-                    className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10"
+                    className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10 focus:border-violet-500 focus:outline-none"
                   />
                   <button
                     onClick={() => setSelectedItemData(prev => ({
@@ -225,66 +227,36 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
               <div className="w-full border-t border-white/10"></div>
             </div>
             <div className="relative flex justify-center">
-              <span className="px-2 text-sm text-gray-400 bg-gray-800">AND/OR</span>
+              <span className="px-2 text-sm text-gray-400 bg-gray-800">OR</span>
             </div>
           </div>
 
           {/* Coin Selection */}
           <div>
-            <h3 className="text-sm font-medium text-gray-300 mb-2">Offer Coins:</h3>
+            <h3 className="text-sm font-medium text-gray-300 mb-2">Offer Coins</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400">
-                  Copper (Current: {currentCoins.copper || 0})
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={currentCoins.copper || 0}
-                  value={coins.copper}
-                  onChange={(e) => setCoins({ ...coins, copper: parseInt(e.target.value) || 0 })}
-                  className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400">
-                  Silver (Current: {currentCoins.silver || 0})
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={currentCoins.silver || 0}
-                  value={coins.silver}
-                  onChange={(e) => setCoins({ ...coins, silver: parseInt(e.target.value) || 0 })}
-                  className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400">
-                  Gold (Current: {currentCoins.gold || 0})
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={currentCoins.gold || 0}
-                  value={coins.gold}
-                  onChange={(e) => setCoins({ ...coins, gold: parseInt(e.target.value) || 0 })}
-                  className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400">
-                  Platinum (Current: {currentCoins.platinum || 0})
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={currentCoins.platinum || 0}
-                  value={coins.platinum}
-                  onChange={(e) => setCoins({ ...coins, platinum: parseInt(e.target.value) || 0 })}
-                  className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600"
-                />
-              </div>
+              {Object.entries(counterCoins).map(([type, amount]) => (
+                <div key={type}>
+                  <label className="block text-sm text-gray-400 mb-1 capitalize">
+                    {type} ({currentCoins[type as keyof typeof currentCoins] || 0})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={currentCoins[type as keyof typeof currentCoins] || 0}
+                    value={amount}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 0;
+                      const maxValue = currentCoins[type as keyof typeof currentCoins] || 0;
+                      setCounterCoins(prev => ({
+                        ...prev,
+                        [type]: Math.min(value, maxValue)
+                      }));
+                    }}
+                    className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10 focus:border-violet-500 focus:outline-none"
+                  />
+                </div>
+              ))}
             </div>
           </div>
 

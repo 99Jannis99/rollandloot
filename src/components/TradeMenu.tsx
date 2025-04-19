@@ -31,6 +31,13 @@ interface SelectedItemData {
   maxQuantity: number;
 }
 
+interface CurrentCoins {
+  copper: number;
+  silver: number;
+  gold: number;
+  platinum: number;
+}
+
 export function TradeMenu({ groupId, partnerId, onClose, onTradeComplete }: TradeMenuProps) {
   const { user } = useUser();
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -42,6 +49,12 @@ export function TradeMenu({ groupId, partnerId, onClose, onTradeComplete }: Trad
     maxQuantity: 1
   });
   const [offeredCoins, setOfferedCoins] = useState({
+    copper: 0,
+    silver: 0,
+    gold: 0,
+    platinum: 0
+  });
+  const [currentCoins, setCurrentCoins] = useState<CurrentCoins>({
     copper: 0,
     silver: 0,
     gold: 0,
@@ -87,6 +100,39 @@ export function TradeMenu({ groupId, partnerId, onClose, onTradeComplete }: Trad
 
     loadInventoryItems();
   }, [groupId, user]);
+
+  // Lade die aktuellen Coins des Benutzers
+  useEffect(() => {
+    async function loadCurrentCoins() {
+      if (!user) return;
+      
+      try {
+        const supabaseUser = await syncUser(user);
+        const { data: inventory } = await supabase
+          .from('group_inventories')
+          .select('id')
+          .eq('group_id', groupId)
+          .eq('user_id', supabaseUser.id)
+          .single();
+
+        if (!inventory) return;
+
+        const { data: coins } = await supabase
+          .from('inventory_currencies')
+          .select('copper, silver, gold, platinum')
+          .eq('inventory_id', inventory.id)
+          .single();
+
+        if (coins) {
+          setCurrentCoins(coins);
+        }
+      } catch (err) {
+        console.error('Error loading coins:', err);
+      }
+    }
+
+    loadCurrentCoins();
+  }, [user, groupId]);
 
   async function handleCreateTrade() {
     if (!user) return;
@@ -143,7 +189,7 @@ export function TradeMenu({ groupId, partnerId, onClose, onTradeComplete }: Trad
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md relative">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md relative max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-500/70">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-gray-400 hover:text-gray-300"
@@ -256,16 +302,21 @@ export function TradeMenu({ groupId, partnerId, onClose, onTradeComplete }: Trad
               {Object.entries(offeredCoins).map(([type, amount]) => (
                 <div key={type}>
                   <label className="block text-sm text-gray-400 mb-1 capitalize">
-                    {type}
+                    {type} ({currentCoins[type as keyof CurrentCoins]})
                   </label>
                   <input
                     type="number"
                     min="0"
+                    max={currentCoins[type as keyof CurrentCoins]}
                     value={amount}
-                    onChange={(e) => setOfferedCoins(prev => ({
-                      ...prev,
-                      [type]: parseInt(e.target.value) || 0
-                    }))}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 0;
+                      const maxValue = currentCoins[type as keyof CurrentCoins];
+                      setOfferedCoins(prev => ({
+                        ...prev,
+                        [type]: Math.min(value, maxValue)
+                      }));
+                    }}
                     className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10"
                   />
                 </div>

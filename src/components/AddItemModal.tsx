@@ -134,7 +134,7 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md relative max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-500/70">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-gray-400 hover:text-gray-300"
@@ -162,7 +162,7 @@ export function AddItemModal({ groupId, playerId, onClose, onItemAdded }: AddIte
             
             {/* Live Search Results Dropdown */}
             {searchResults.length > 0 && !selectedItem && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-gray-700 rounded-lg border border-white/10 shadow-lg max-h-60 overflow-y-auto z-10">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-gray-700 rounded-lg border border-white/10 shadow-lg max-h-60 overflow-y-auto z-10 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-500/70">
                 {searchResults.map((item) => (
                   <button
                     key={item.id}
