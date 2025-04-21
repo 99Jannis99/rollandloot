@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Trade, makeCounterOffer } from '../services/tradeService';
-import { CurrencyDisplay } from './CurrencyDisplay';
 import { getUserInventoryItems } from '../services/groupService';
 import { useUser } from '@clerk/clerk-react';
 import { syncUser } from '../services/userService';
@@ -144,18 +143,27 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
               </div>
             </>
           )}
+          {/* Angebotene Coins */}
           {trade.offered_coins && (
             <div className="mt-2">
               <h4 className="text-sm font-medium text-gray-300 mb-2">Offered Coins:</h4>
-              <CurrencyDisplay 
-                currencies={[
-                  { type: 'copper', amount: trade.offered_coins.copper },
-                  { type: 'silver', amount: trade.offered_coins.silver },
-                  { type: 'gold', amount: trade.offered_coins.gold },
-                  { type: 'platinum', amount: trade.offered_coins.platinum }
-                ]} 
-                isDM={false} 
-              />
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(trade.offered_coins)
+                  .filter(([_, amount]) => amount > 0)
+                  .map(([type, amount]) => (
+                    <div key={type} className="flex items-center justify-between p-2 bg-black/20 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={`/public/icons/${type}.svg`} 
+                          alt={type} 
+                          className="w-6 h-6"
+                        />
+                        <span className="text-sm text-gray-300 capitalize">{type}</span>
+                      </div>
+                      <span className="text-sm text-gray-300">{amount}</span>
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
         </div>
