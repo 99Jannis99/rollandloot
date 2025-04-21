@@ -184,11 +184,11 @@ export function IncomingTradeModal({ trade, onClose, onTradeUpdated }: IncomingT
                   maxQuantity: selectedItem?.quantity || 1
                 });
               }}
-              className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10 focus:border-violet-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-black/20 rounded-lg border border-white/10 focus:border-violet-500 focus:outline-none transition-all duration-200 ease-in-out transform hover:scale-[1.02]"
             >
-              <option value="">Select an item...</option>
+              <option value="" className="bg-gray-800 text-gray-300">Select an item...</option>
               {inventoryItems.map((item) => (
-                <option key={item.id} value={item.id}>
+                <option key={item.id} value={item.id} className="bg-gray-800 text-gray-300">
                   {item.items.name} (Available: {item.quantity})
                 </option>
               ))}

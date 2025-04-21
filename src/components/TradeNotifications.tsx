@@ -205,10 +205,10 @@ export function TradeNotifications({ groupId }: TradeNotificationsProps) {
           key={trade.id}
           className="bg-gray-800 rounded-lg p-4 border border-white/10 shadow-lg animate-slide-in"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium">New Trade Offer</h3>
-              <p className="text-sm text-gray-400">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium truncate">New Trade Offer</h3>
+              <p className="text-sm text-gray-400 truncate">
                 From:{" "}
                 <span title={trade.initiator?.username || ""} className="truncate">
                   {trade.initiator?.username?.length > 20
@@ -219,7 +219,7 @@ export function TradeNotifications({ groupId }: TradeNotificationsProps) {
             </div>
             <button
               onClick={() => setSelectedTrade(trade)}
-              className="px-3 py-1 text-sm bg-violet-600 text-white hover:bg-violet-700 rounded-lg"
+              className="flex-shrink-0 px-3 py-1 text-sm bg-violet-600 text-white hover:bg-violet-700 rounded-lg whitespace-nowrap"
             >
               View Offer
             </button>
